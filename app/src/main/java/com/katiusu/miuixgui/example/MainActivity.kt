@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -257,11 +258,6 @@ private fun MainScreen(
         drawContent()
     }
     val blurActive = isBlurEnabled
-    // 切页动画期间挂起底栏 / 侧栏的纹理模糊与整页 backdrop 录制：
-    // 动画期间页面内容逐帧位移，模糊来源（整页 backdrop）会被逐帧重录、
-    // 模糊逐帧重算，这是切页掉帧的主要来源之一。动画结束后立即恢复，
-    // 底栏背后本身就是页面表面色，视觉上几乎无差异。
-    val navBlurActive = blurActive && !isNavigating
 
     val navBarMode = if (!isFloatingNavbar) 0 else if (!isLiquidGlass) 1 else 2
     val isWideScreen = shouldShowSplitPane()
@@ -299,14 +295,12 @@ private fun MainScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(if (navBlurActive) Modifier.layerBackdrop(backdrop) else Modifier)
+                .then(Modifier.layerBackdrop(backdrop))
                 .background(surfaceColor)
         ) {
             HorizontalPager(
                 state = pagerState,
-                // 预组合全部 4 页：否则跨页跳转时目标页会在动画进行中才首次组合
-                // （关于页的首次组合最贵：图标解码 + 多张模糊卡片 + 动效 painter）。
-                beyondViewportPageCount = 3,
+                beyondViewportPageCount = 1,
                 contentPadding = pagerPadding,
                 modifier = Modifier
                     .fillMaxSize()
@@ -317,41 +311,43 @@ private fun MainScreen(
                 userScrollEnabled = false,
                 pageNestedScrollConnection = PagerGestureNestedScrollConnection,
             ) { page ->
-                when (page) {
-                    0 -> HomePageView(
-                        isBlurEnabled = isBlurEnabled,
-                        refreshKey = homeRefreshKey,
-                        extraBottomPadding = navBarHeight,
-                        onOpenExamples = { onItemSelected(1) },
-                    )
-                    1 -> FeaturesPageView(
-                        isBlurEnabled = isBlurEnabled,
-                        extraBottomPadding = navBarHeight,
-                    )
-                    2 -> SettingsPageView(
-                        currentMode = themeMode,
-                        onModeChange = onThemeModeChange,
-                        isFloatingNavbar = isFloatingNavbar,
-                        onFloatingNavbarChange = onFloatingNavbarChange,
-                        isLiquidGlass = isLiquidGlass,
-                        onLiquidGlassChange = onLiquidGlassChange,
-                        isBlurEnabled = isBlurEnabled,
-                        onBlurEnabledChange = onBlurEnabledChange,
-                        checkUpdateOnLaunch = checkUpdateOnLaunch,
-                        onCheckUpdateOnLaunchChange = onCheckUpdateOnLaunchChange,
-                        onCheckUpdate = onCheckUpdate,
-                        isCheckingUpdate = isCheckingUpdate,
-                        extraBottomPadding = navBarHeight,
-                    )
-                    3 -> AboutPageContent(
-                        openLicensePage = {
-                            context.startActivity(Intent(context, LicenseActivity::class.java))
-                        },
-                        isBlurEnabled = isBlurEnabled,
-                        // 只有关于页可见且不处于切页动画时才播放动态背景：
-                        // 它的帧循环每帧重绘，是整屏 backdrop 与模糊逐帧重算的根源。
-                        animateBackground = selectedIndex == 3 && !isNavigating,
-                    )
+                // 每个页面各占一个独立硬件层（hardware layer）：横向切换时 pager 只是把已经
+                // 渲染好的页面图层按新的偏移合成，页面内部的卡片、顶栏模糊与动效背景都不必
+                // 在切换动画里逐帧重绘。模糊、底栏与页面结构保持原样，不关闭任何效果。
+                Box(modifier = Modifier.fillMaxSize().graphicsLayer()) {
+                    when (page) {
+                        0 -> HomePageView(
+                            isBlurEnabled = isBlurEnabled,
+                            refreshKey = homeRefreshKey,
+                            extraBottomPadding = navBarHeight,
+                            onOpenExamples = { onItemSelected(1) },
+                        )
+                        1 -> FeaturesPageView(
+                            isBlurEnabled = isBlurEnabled,
+                            extraBottomPadding = navBarHeight,
+                        )
+                        2 -> SettingsPageView(
+                            currentMode = themeMode,
+                            onModeChange = onThemeModeChange,
+                            isFloatingNavbar = isFloatingNavbar,
+                            onFloatingNavbarChange = onFloatingNavbarChange,
+                            isLiquidGlass = isLiquidGlass,
+                            onLiquidGlassChange = onLiquidGlassChange,
+                            isBlurEnabled = isBlurEnabled,
+                            onBlurEnabledChange = onBlurEnabledChange,
+                            checkUpdateOnLaunch = checkUpdateOnLaunch,
+                            onCheckUpdateOnLaunchChange = onCheckUpdateOnLaunchChange,
+                            onCheckUpdate = onCheckUpdate,
+                            isCheckingUpdate = isCheckingUpdate,
+                            extraBottomPadding = navBarHeight,
+                        )
+                        3 -> AboutPageContent(
+                            openLicensePage = {
+                                context.startActivity(Intent(context, LicenseActivity::class.java))
+                            },
+                            isBlurEnabled = isBlurEnabled,
+                        )
+                    }
                 }
             }
         }
@@ -378,7 +374,7 @@ private fun MainScreen(
                 modifier = Modifier
                     .onSizeChanged { railWidthPx = it.width }
                     .then(
-                        if (navBlurActive) {
+                        if (blurActive) {
                             Modifier.textureBlur(
                                 backdrop = backdrop,
                                 shape = RectangleShape,
@@ -393,7 +389,7 @@ private fun MainScreen(
                             Modifier
                         }
                     ),
-                color = if (navBlurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
+                color = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
                 state = railState,
             ) {
                 items.forEachIndexed { index, label ->
@@ -416,7 +412,7 @@ private fun MainScreen(
                     icons = icons,
                     selectedIndex = selectedIndex,
                     backdrop = backdrop,
-                    blurActive = navBlurActive,
+                    blurActive = blurActive,
                     onItemSelected = onItemSelected,
                 )
             }

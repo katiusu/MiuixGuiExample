@@ -23,7 +23,7 @@
 
 - **许可证改为 Apache-2.0**：根目录 `LICENSE` 由 The Unlicense 换为 Apache License 2.0，关于页许可条目与链接同步更新
 - **移除隐藏桌面图标机制**：删除 `activity-alias`（`LauncherAlias`）与 `LauncherIconController`，桌面图标改由 `MainActivity` 单一提供（修复「桌面出现两个图标」）
-- **切页性能优化**：关于页动效背景改为按需播放（`AboutPageContent(animateBackground = …)`）；切页动画期间挂起底栏 / 侧栏纹理模糊与整页 backdrop 录制（`navBlurActive = blurActive && !isNavigating`）；`beyondViewportPageCount` 由 `1` 改为 `3`，预组合全部页面，避免跨页跳转时目标页在动画中途才首次组合
+- **切页性能优化（重写）**：改为给 pager 每一页加硬件层（`Modifier.graphicsLayer()`），切页动画只做图层合成，页面内容不再逐帧重绘；补齐上游 Miuix 示例中「背景全透明时暂停动效帧循环」的逻辑。不改页面结构、不改底栏，模糊总开关开启时动画期间不再中途关闭
 - **README 重写**：新增切页性能与目录结构说明，许可证章节更新为 Apache-2.0
 - **清理**：删除无引用的字符串资源、关于页版权行与占位说明
 

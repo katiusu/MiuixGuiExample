@@ -162,6 +162,14 @@ private class BgEffectNode(
         drawRect(surface)
         if (effectBackground) {
             val alphaValue = alpha()
+            // 与上游 Miuix 官方示例同步：背景完全透明（不可见）时停掉帧循环，
+            // 重新可见时再启动，避免不可见的动效持续触发重绘。
+            if (alphaValue <= 0f) {
+                animationJob?.cancel()
+                animationJob = null
+            } else if (playing && animationJob == null) {
+                startAnimation()
+            }
             if (alphaValue > 0f) {
                 val drawHeight = if (isFullSize) size.height * 0.8f else size.height * 0.5f
 
