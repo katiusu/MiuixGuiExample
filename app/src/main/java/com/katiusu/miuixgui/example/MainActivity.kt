@@ -109,9 +109,6 @@ class MainActivity : ComponentActivity() {
 
         val savedSettings = AppSettings.load(this)
 
-        // 桌面图标默认隐藏（设置项已移除），每次启动同步一次组件状态。
-        LauncherIconController.apply(this, LauncherIconController.HIDE_BY_DEFAULT)
-
         // 覆盖 XML 主题的窗口背景，兼容「系统浅色但应用内手动强制深色」的情况，避免启动白屏闪烁。
         applyWindowBackground(savedSettings.themeMode)
 

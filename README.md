@@ -39,7 +39,7 @@
 - **关于页** — Logo 折叠渐显顶栏、`textureBlur` 纹理模糊卡片、版本号、项目地址 / 群组 / 许可证入口，以及应用内第三方许可证与致谢页
 - **示例功能页** — `featureSpecs()` 内置每种组件类型的示例卡片与子页面（含子页面搜索），便于照葫芦画瓢
 - **应用内检查更新** — 启动自动检查与手动检查，发现新版本弹窗展示更新说明并跳转下载页
-- **语言与图标** — `LocaleHelper` 包语言（`attachBaseContext`）；桌面图标由 `activity-alias` + `LauncherIconController` 控制，启动时默认隐藏
+- **语言** — `LocaleHelper` 包语言（`attachBaseContext`）；桌面图标由 `MainActivity` 单一提供
 
 <br>
 
@@ -116,7 +116,6 @@ app/src/main/java/com/katiusu/miuixgui/example/
 ├── MainActivity.kt              # 四标签页外壳 + 三种底栏 + 宽屏导航栏
 ├── TemplateApp.kt               # Application：初始化配置系统与桥接对象
 ├── AppSettings.kt               # 应用级设置（主题模式 / 底栏 / 模糊 / 语言）
-├── LauncherIconController.kt    # 桌面图标默认隐藏（activity-alias 启停）
 ├── LocaleHelper.kt              # 语言切换与包 Context
 ├── UpdateChecker.kt             # GitHub Release 检查更新
 ├── LicenseActivity.kt
@@ -136,7 +135,7 @@ app/src/main/java/com/katiusu/miuixgui/example/
 
 # 二次开发
 
-1. 改包名 / 应用名：`app/build.gradle.kts` 的 `namespace` / `applicationId`、`settings.gradle.kts` 的 `rootProject.name`、`res/values*/strings.xml` 的 `app_name`（若改包名，`LauncherIconController.LAUNCHER_ALIAS_CLASS` 与 `ExampleInstrumentedTest` 也要同步）。
+1. 改包名 / 应用名：`app/build.gradle.kts` 的 `namespace` / `applicationId`、`settings.gradle.kts` 的 `rootProject.name`、`res/values*/strings.xml` 的 `app_name`（若改包名，`ExampleInstrumentedTest` 也要同步）。
 2. 换应用图标：`res/drawable/ic_launcher_*.xml`、`res/mipmap-*/ic_launcher*`。
 3. 改关于页链接：`strings.xml` 的 `about_source_code_summary`、`about_telegram_summary`；更新检查仓库改 `UpdateChecker.REPO`。
 4. 增删配置项：在 `ui/screen/features/FeaturesPage.kt` 的 `featureSpecs()` 里声明 `OptionSpec`，界面会自动渲染对应组件；子页面用 `HookSubPage` 并入功能页搜索。
@@ -146,7 +145,6 @@ app/src/main/java/com/katiusu/miuixgui/example/
 
 # 已知取舍
 
-- **桌面图标默认隐藏且无设置项**：应用每次启动都会禁用 `activity-alias`，安装后不会出现桌面图标；原模板隐藏图标后可从 LSPosed 管理器进入设置页，剥离后已无第二个入口。若需要桌面入口，可把 `LauncherIconController.HIDE_BY_DEFAULT` 改为 `false` 后重新构建。
 - **「已生效 / 未生效」为本地状态**：无 Hook 回报机制，仅由 `HookStatusStore` 记录本地配置变更，语义上等同于「已修改」。
 - **「重启应用」依赖 `su`**：`bridge/AppRestarter` 通过 `su -c` 执行 `am force-stop` 与重启；无 Root 时对话框会提示失败。
 - **作用域相关入口已移除**：`ensureScope()` 为直接成功的桩实现，主页状态卡恒显示「未激活」，这是剥离 Xposed 后的预期表现。
