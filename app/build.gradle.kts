@@ -34,7 +34,19 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
+            // debug 构建（debuggable = true，且不含依赖库的基线配置 baseline.prof）在 Compose 下
+            // 明显更慢；日常体验请用 release 产物：R8 代码压缩 + proguard-android-optimize 优化，
+            // 与参考模板 MiuixGuiTemplate 的 release 配置一致。
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
+            // 未开 isShrinkResources（资源压缩）：本容器只能用 build-tools 36.0.0 的 aarch64 aapt2，
+            // AGP 的 release 资源优化/压缩链路在该版本下会产出空的 resources-release-optimize.ap_，
+            // 最终打出没有 AndroidManifest.xml / resources.arsc 的坏 APK。
+            // 因此 gradle.properties 里关闭了 android.enableResourceOptimizations，资源也不压缩
+            // （只影响包体大小，不影响运行流畅度）。
         }
     }
 

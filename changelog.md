@@ -27,6 +27,14 @@
 - **README 重写**：新增切页性能与目录结构说明，许可证章节更新为 Apache-2.0
 - **清理**：删除无引用的字符串资源、关于页版权行与占位说明
 
+### 流畅度定位与 release 构建（2026-10-05）
+
+- **逐页对比结论**：与 [MiuixGuiTemplate](https://github.com/Ianzb/MiuixGuiTemplate) 逐文件归一化 diff 后确认，除本工程主动删掉的模块框架相关功能外，页面代码与模板逐行相同（`FeaturesPage.kt` / `BlurUtils.kt` / `BgEffectBackground.kt` / `HookOptionsPage.kt` / 功能子页 / `SubPageScaffold.kt` 完全一致）。切页掉帧不是页面写法问题，模板本身也是这套代码。
+- **真正的大头是构建类型**：此前提供的演示包是 debug 构建 —— `debuggable = true`（ART 不做优化）、不经 R8、且不含依赖库基线配置（实测 debug APK 内没有 `assets/dexopt/baseline.prof`，release 包内有）。Compose 在 debug 下的固定开销远大于页面层可优化空间。
+- **release 构建**：`isMinifyEnabled = true` + `proguard-android-optimize.txt`（与模板一致），新增 `app/proguard-rules.pro`；实测 APK 由 42.99 MB 降到 2.99 MB，包含 `baseline.prof` / `baseline.profm`。
+- **修复容器构建坑**：build-tools 36.0.0 的 aarch64 aapt2 下，AGP 的 release 资源优化链路会静默产出空的 `resources-release-optimize.ap_`，导致 `packageRelease` 打出一个没有 `AndroidManifest.xml` / `resources.arsc` 的坏 APK（`aapt2 dump badging` 报 `could not identify format of APK`）。`gradle.properties` 增加 `android.enableResourceOptimizations=false`，release 暂不启用 `isShrinkResources`。
+- **README**：新增「流畅度：请用 release 包」「与参考模板的差异」「生成 release 包」与容器注意事项。
+
 ## 0.5.2
 
 > 发布于 2026-10-01

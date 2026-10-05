@@ -32,9 +32,22 @@
 - **功能页**：以开关、复选框、箭头、下拉、单选、滑块、文本框、应用列表等组件示例，演示 `HookOptionsPage` / `HookSection` / `SubPageScaffold` 的用法。
 - **多语言**：`values/`（简体中文）与 `values-en/`（英文）两套字符串资源，条目一一对应；切换语言即时重建界面。
 
-## 切页性能
+## 流畅度：请用 release 包
 
-参考模板的页面结构在切页时会有可感知的掉帧。这里**没有关闭任何模糊、没有改底栏、也没有改页面结构**，只是从渲染路径上减少每帧的实际工作量（改动集中在 `MainActivity.kt` 与 `ui/component/effect/BgEffectModifier.kt`）：
+debug 构建的固定开销远大于任何界面层优化，**测流畅度必须用 release 包**。同一份代码实测：
+
+| | debug | release |
+| --- | --- | --- |
+| `debuggable` | `true`（ART 不做优化） | `false` |
+| 依赖库基线配置 `assets/dexopt/baseline.prof` | 无 | 有（含 `baseline.prof` + `baseline.profm`） |
+| R8 代码压缩 / 优化 | 无 | 有（`proguard-android-optimize.txt`） |
+| APK 体积 | 42.99 MB | 2.99 MB |
+
+因此本工程与参考模板一致，把 R8 与资源处理都放在 release 构建上（见 `app/build.gradle.kts`）。用 debug 包体验界面动效时出现掉帧，先换 release 包复测。
+
+### 页面层能做的优化
+
+参考模板 MiuixGuiTemplate 的页面代码与本工程逐行相同（见下节对比），切页掉帧不是某一页写法的问题，而是渲染路径上的固定开销。本工程**没有关闭任何模糊、没有改底栏、也没有改页面结构**，只减少每帧实际工作量（改动集中在 `MainActivity.kt` 与 `ui/component/effect/BgEffectModifier.kt`）：
 
 1. **每个页面各占一个硬件层**：pager 的每一页外层包一个 `Modifier.graphicsLayer()`。切页动画里 pager 只需把已经渲染好的页面图层按新偏移合成，页面内部的卡片、顶栏模糊与动效背景不必逐帧重绘（等价于 `ViewPager2` 给页面加硬件层的做法）。页面自身状态变化时图层照常失效重绘，视觉与交互完全不变。
 2. **补齐上游的动效背景暂停逻辑**：`BgEffectModifier.kt` 抄自参考模板，比上游 Miuix 官方示例旧了一版。上游在背景完全透明（`alpha() <= 0f`，即肉眼不可见）时会取消帧循环、重新可见时再启动；本工程把这段补上，避免不可见的动效一直触发重绘。
@@ -51,8 +64,11 @@
 | 页面 | 仅保留 GUI：首页 / 功能 / 设置 / 关于 / 开源许可 / 功能子页 |
 | 设置页 | 精简为界面、语言、更新、数据四组；无隐藏桌面图标开关，无设备类型下拉 |
 | 关于页 | 无模板来源标注，许可条目指向 Apache-2.0 |
-| 性能 | 每页一个硬件层，切页只做图层合成；动效背景暂停逻辑与上游 Miuix 示例对齐 |
+| 构建 | release 开启 R8 代码压缩与优化（`proguard-android-optimize.txt`）；因容器 aapt2 限制关闭了 release 资源优化，见「构建」一节 |
+| 页面层性能 | 每个页面一个硬件层；动效背景暂停逻辑与上游 Miuix 示例对齐 |
 | 桌面图标 | 仅 `MainActivity` 单一入口（不再使用 `activity-alias` 别名机制） |
+
+页面代码层面的差异只有上述被删掉的功能：`FeaturesPage.kt`、`BlurUtils.kt`、`BgEffectBackground.kt`、`HookOptionsPage.kt`、功能子页与 `SubPageScaffold.kt` 与模板逐行相同；`HomePage.kt` 只少了作用域页入口；设置页 / 关于页 / 许可页 / `MainActivity.kt` 的差异全部是本工程删掉的模块分区与隐藏图标开关。
 
 ## 系统要求
 
@@ -70,7 +86,14 @@ export ANDROID_HOME=/opt/android-sdk
 
 产物：`app/build/outputs/apk/debug/app-debug.apk`。
 
-Release 包需要 `release.keystore` 与三个环境变量：`KEYSTORE_PASSWORD`、`KEY_ALIAS`（默认 `release`）、`KEY_PASSWORD`。
+### 生成 release 包（体验流畅度请用这个）
+
+```bash
+export KEYSTORE_PASSWORD=… KEY_ALIAS=… KEY_PASSWORD=…
+GRADLE_USER_HOME=/root/.gradle-miuix ./gradlew --no-daemon --console=plain :app:assembleRelease
+```
+
+产物：`app/build/outputs/apk/release/app-release.apk`。签名读取 `../release.keystore` 与上述三个环境变量；该文件已被 `.gitignore` 排除，需要自备。本地只想试装、而设备上已装的是 debug 签名版本时，可以把 debug keystore 复制成 `release.keystore`，用 `KEYSTORE_PASSWORD=android KEY_ALIAS=androiddebugkey KEY_PASSWORD=android` 签名，这样可以直接覆盖安装。
 
 ### 在 aarch64 / PRoot 容器里构建
 
@@ -82,6 +105,7 @@ Release 包需要 `release.keystore` 与三个环境变量：`KEYSTORE_PASSWORD`
    ```
 
 3. 容器里建议加 `--no-daemon`，避免残留 daemon 互相抢锁。
+4. `gradle.properties` 里关闭了 `android.enableResourceOptimizations`：AGP 的 release 资源优化链路（`aapt2 optimize` + proto 格式）在 build-tools 36.0.0 的 aapt2 下会**静默产出空的 `resources-release-optimize.ap_`**，于是 `packageRelease` 打出一个没有 `AndroidManifest.xml` / `resources.arsc` 的坏包（`aapt2 dump badging` 会报 `could not identify format of APK`，`apksigner` 验不出证书，安装必然失败）。关闭后 release 与 debug 走同一条资源打包链路，只损失一点包体；工具链正常的机器上可以删掉这一行并按需打开 `isShrinkResources`。
 
 ## 目录结构
 
@@ -117,11 +141,14 @@ app/src/main/res/values[-en]/strings.xml   # 中英文案（两份条目一一�
 3. 改关于页链接与更新源：`strings.xml` 的 `about_source_code_summary`、`about_telegram_summary`，以及 `UpdateChecker.REPO`（当前仍是 `your-name/your-repo` 占位符，需替换为自己的仓库）。
 4. 接入自己的功能：`FeaturesPage.kt` 里用 `OptionSpec` / `HookSection` 描述选项，`HookOptionsPage` 会自动生成界面、搜索与依赖关系。
 5. 删掉用不到的示例：`ui/component/effect/`、`ui/component/liquid/`、`prefs/` 与 `bridge/` 可整体移除，只要同步清掉引用点即可。
+6. 引入反射 / 序列化库后，记得在 `app/proguard-rules.pro` 补 `-keep` 规则（release 已启用 R8）。
 
 ## 已知取舍
 
 - 模糊基于运行时着色器与 RenderEffect，低端机或长时间滚动仍有开销；不需要时可在设置页关闭总开关。
 - 硬件层让每个在场的页面多占一份离屏缓冲；`beyondViewportPageCount = 1` 时通常只有 2 个页面同时在场，开销有限。
+- release 包会混淆类名与成员名，崩溃堆栈需要配合 `app/build/outputs/mapping/release/mapping.txt` 还原。
+- 关于页的动效背景是每帧重绘的帧循环（这是 Miuix 官方示例本身的行为），它在这一页被组合时会持续产生绘制开销；本工程按「设置开着模糊就不中途关闭效果」的原则保留该行为，未做按需暂停。
 
 ## 第三方依赖
 
