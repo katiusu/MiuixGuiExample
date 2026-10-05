@@ -257,6 +257,11 @@ private fun MainScreen(
         drawContent()
     }
     val blurActive = isBlurEnabled
+    // 切页动画期间挂起底栏 / 侧栏的纹理模糊与整页 backdrop 录制：
+    // 动画期间页面内容逐帧位移，模糊来源（整页 backdrop）会被逐帧重录、
+    // 模糊逐帧重算，这是切页掉帧的主要来源之一。动画结束后立即恢复，
+    // 底栏背后本身就是页面表面色，视觉上几乎无差异。
+    val navBlurActive = blurActive && !isNavigating
 
     val navBarMode = if (!isFloatingNavbar) 0 else if (!isLiquidGlass) 1 else 2
     val isWideScreen = shouldShowSplitPane()
@@ -294,12 +299,14 @@ private fun MainScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .then(Modifier.layerBackdrop(backdrop))
+                .then(if (navBlurActive) Modifier.layerBackdrop(backdrop) else Modifier)
                 .background(surfaceColor)
         ) {
             HorizontalPager(
                 state = pagerState,
-                beyondViewportPageCount = 1,
+                // 预组合全部 4 页：否则跨页跳转时目标页会在动画进行中才首次组合
+                // （关于页的首次组合最贵：图标解码 + 多张模糊卡片 + 动效 painter）。
+                beyondViewportPageCount = 3,
                 contentPadding = pagerPadding,
                 modifier = Modifier
                     .fillMaxSize()
@@ -341,6 +348,9 @@ private fun MainScreen(
                             context.startActivity(Intent(context, LicenseActivity::class.java))
                         },
                         isBlurEnabled = isBlurEnabled,
+                        // 只有关于页可见且不处于切页动画时才播放动态背景：
+                        // 它的帧循环每帧重绘，是整屏 backdrop 与模糊逐帧重算的根源。
+                        animateBackground = selectedIndex == 3 && !isNavigating,
                     )
                 }
             }
@@ -368,7 +378,7 @@ private fun MainScreen(
                 modifier = Modifier
                     .onSizeChanged { railWidthPx = it.width }
                     .then(
-                        if (blurActive) {
+                        if (navBlurActive) {
                             Modifier.textureBlur(
                                 backdrop = backdrop,
                                 shape = RectangleShape,
@@ -383,7 +393,7 @@ private fun MainScreen(
                             Modifier
                         }
                     ),
-                color = if (blurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
+                color = if (navBlurActive) Color.Transparent else MiuixTheme.colorScheme.surface,
                 state = railState,
             ) {
                 items.forEachIndexed { index, label ->
@@ -406,7 +416,7 @@ private fun MainScreen(
                     icons = icons,
                     selectedIndex = selectedIndex,
                     backdrop = backdrop,
-                    blurActive = blurActive,
+                    blurActive = navBlurActive,
                     onItemSelected = onItemSelected,
                 )
             }

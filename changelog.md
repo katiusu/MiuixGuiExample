@@ -19,6 +19,14 @@
 - **构建与清单**：`compileSdk 37` / `buildToolsVersion 36.0.0` / `minSdk 34` / `targetSdk 34`；删除 `splits.abi`（不再限定 arm64-v8a 产物）、删除 `de.robv.android.xposed.category.MODULE_SETTINGS` intent-filter（主 Activity 改为 `MAIN` + `LAUNCHER`）
 - **随 hook 一并移除**：`docs/`、`.github/workflows/`、`gradle/gradle-daemon-jvm.properties`（要求 JDK 25）；`README.md` 按纯 GUI 工程重写
 
+### 后续调整（2026-10-05，版本号仍为 1.0）
+
+- **许可证改为 Apache-2.0**：根目录 `LICENSE` 由 The Unlicense 换为 Apache License 2.0，关于页许可条目与链接同步更新
+- **移除隐藏桌面图标机制**：删除 `activity-alias`（`LauncherAlias`）与 `LauncherIconController`，桌面图标改由 `MainActivity` 单一提供（修复「桌面出现两个图标」）
+- **切页性能优化**：关于页动效背景改为按需播放（`AboutPageContent(animateBackground = …)`）；切页动画期间挂起底栏 / 侧栏纹理模糊与整页 backdrop 录制（`navBlurActive = blurActive && !isNavigating`）；`beyondViewportPageCount` 由 `1` 改为 `3`，预组合全部页面，避免跨页跳转时目标页在动画中途才首次组合
+- **README 重写**：新增切页性能与目录结构说明，许可证章节更新为 Apache-2.0
+- **清理**：删除无引用的字符串资源、关于页版权行与占位说明
+
 ## 0.5.2
 
 > 发布于 2026-10-01

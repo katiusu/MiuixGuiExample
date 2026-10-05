@@ -75,6 +75,12 @@ import top.yukonga.miuix.kmp.basic.Text as MiuixText
 fun AboutPageContent(
     openLicensePage: () -> Unit,
     isBlurEnabled: Boolean = true,
+    /**
+     * 是否播放动效背景。该背景内部是每帧重绘的帧循环，同时又是页内多张
+     * textureBlur 卡片的模糊来源，因此离开本页或处于切页动画中应关闭，
+     * 否则整屏 backdrop 与模糊会被逐帧重算。
+     */
+    animateBackground: Boolean = true,
 ) {
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     val lazyListState = rememberLazyListState()
@@ -131,6 +137,7 @@ fun AboutPageContent(
                 lazyListState = lazyListState,
                 scrollProgressProvider = { scrollProgress },
                 openLicensePage = openLicensePage,
+                animateBackground = animateBackground,
             )
         }
     }
@@ -143,6 +150,7 @@ private fun AboutContent(
     lazyListState: LazyListState,
     scrollProgressProvider: () -> Float,
     openLicensePage: () -> Unit,
+    animateBackground: Boolean,
 ) {
     val uriHandler = LocalUriHandler.current
     val contentBackdrop = rememberBlurBackdrop()
@@ -203,7 +211,7 @@ private fun AboutContent(
     } catch (_: Exception) { "1.0" }
 
     BgEffectBackground(
-        dynamicBackground = true,
+        dynamicBackground = animateBackground,
         isFullSize = true,
         modifier = Modifier.fillMaxSize(),
         bgModifier = if (contentBackdrop != null) Modifier.layerBackdrop(contentBackdrop) else Modifier,
@@ -388,7 +396,7 @@ private fun AboutContent(
                         ArrowPreference(
                             title = stringResource(R.string.license_name),
                             summary = stringResource(R.string.license_summary),
-                            onClick = { uriHandler.openUri("https://unlicense.org/") },
+                            onClick = { uriHandler.openUri("https://www.apache.org/licenses/LICENSE-2.0") },
                         )
                         ArrowPreference(
                             title = stringResource(R.string.about_dependencies),

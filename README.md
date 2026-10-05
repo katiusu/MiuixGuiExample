@@ -1,173 +1,159 @@
-<!--suppress HtmlDeprecatedAttribute, HtmlDeprecatedTag -->
 <div align="center">
 
 # MiuixGuiExample
 
-### 从 MiuixGuiTemplate 提取的纯 GUI 工程
+一个基于 [Miuix](https://github.com/Yukonga/miuix) 组件库的 Android 纯 GUI 示例工程：四个标签页、三种底部导航形态、随滚动渐进的模糊顶栏，以及一套完整的设置 / 关于 / 开源许可页面。
 
 ![Platform](https://img.shields.io/badge/Platform-Android-green)
 ![Miuix](https://img.shields.io/badge/Miuix-0.9.4-blue)
-![Compose](https://img.shields.io/badge/Compose-BOM%202026.09.00-4285F4)
-![License](https://img.shields.io/badge/License-Unlicense-blue)
+![Compose](https://img.shields.io/badge/Compose-BOM%202026.09.00-blue)
+![License](https://img.shields.io/badge/License-Apache--2.0-orange)
+
+[下载演示包](https://github.com/katiusu/MiuixGuiExample/releases/latest) · [更新日志](changelog.md)
 
 </div>
 
-**MiuixGuiExample** 是从 [MiuixGuiTemplate](https://github.com/Ianzb/MiuixGuiTemplate)（一个基于 [libxposed API 102](https://libxposed.github.io/api/index-all.html) 的 LSPosed 模块模板）中**单独提取出来的 GUI 部分**：Xposed / Hook / DexKit / 安全模式 / 作用域等相关内容已全部剥离，界面层代码（Compose 页面、主题、组件、特效、动画与资源）保持原样，可直接作为普通 Android 应用构建、安装与运行，也可当作 Miuix（HyperOS 风格）Compose 应用的起手模板。
+---
 
-<br>
+## 简介
 
-# 下载体验
+本工程是 MIUI / HyperOS 风格 GUI 的最小可用骨架：所有界面能力（导航、模糊、动效、偏好组件、主题、多语言、配置导入导出、更新检查、开源许可展示）都是完整可运行的实现，但不包含任何 Xposed / LSPosed 功能代码 —— 原先依赖模块框架的调用点由 `bridge/` 下的纯 GUI 桩实现补齐，界面调用签名保持一致，因此可以直接在此之上开发自己的界面与业务。
 
-不想自己构建？直接装演示包：[**MiuixGuiExample 1.0 演示包**](https://github.com/katiusu/MiuixGuiExample/releases/latest)（`MiuixGuiExample-1.0-debug.apk`，universal，约 40 MB）
+## 界面能力
 
-- 系统要求 Android 14 (API 34) 及以上；debug 签名，仅用于演示体验，请勿用于正式分发
-- 无 Hook 环境下首页状态卡恒显示「未激活」，「重启应用」按钮依赖 Root，「已生效 / 未生效」为本地记录
+- **四个标签页**：首页、功能、设置、关于，使用 `HorizontalPager` 承载，底栏点击后以弹簧动画切页。
+- **三种底部导航形态**：普通底栏、悬浮底栏（圆角胶囊）、液态玻璃底栏（折射 + 高光），可在设置页实时切换。
+- **宽屏自适应**：宽度 ≥ 840dp 时普通底栏自动变为左侧 `NavigationRail`，≥ 1200dp 自动展开为完整侧栏。
+- **渐进模糊顶栏**：基于 Haze，顶栏背景随内容滚动渐进加深，内容滚到底时收成不透明。
+- **纹理模糊底栏**：基于 Miuix `textureBlur` + `rememberLayerBackdrop`，底栏对页面内容做真实模糊。
+- **动效背景**：关于页顶部的 MIUI/HyperOS 风格流动背景（OS2 / OS3 两套 painter）。
+- **完整设置页**：主题（含 Monet 系统取色）、悬浮底栏 / 液态玻璃 / 模糊总开关、语言（跟随系统 / 简体中文 / English）、启动时检查更新、配置导出与导入（JSON）。
+- **关于页**：应用图标与版本、玻璃信息卡、开源许可页、源码 / 频道入口、检查更新。
+- **功能页**：以开关、复选框、箭头、下拉、单选、滑块、文本框、应用列表等组件示例，演示 `HookOptionsPage` / `HookSection` / `SubPageScaffold` 的用法。
+- **多语言**：`values/`（简体中文）与 `values-en/`（英文）两套字符串资源，条目一一对应；切换语言即时重建界面。
 
-<br>
+## 切页性能
 
-# 界面能力（保留自原模板）
+模板结构在切页时会有可感知的掉帧，本工程针对三处热区做了处理（`MainActivity.kt`、`ui/screen/about/AboutPage.kt`）：
 
-- **四标签页外壳** — 主页 / 功能 / 设置 / 关于，`HorizontalPager` + 弹簧切页动画，禁用横滑手势避免与次级手势冲突
-- **三种底栏形态** — 普通 `NavigationBar`、悬浮 `FloatingNavigationBar`、iOS 风格液态玻璃底栏（`LiquidGlassNavigationBar` + `CombinedBackdrop` / `InnerShadow` / `Lens` / `Vibrancy`）
-- **宽屏适配** — 宽屏自动切 `NavigationRail`（`shouldShowSplitPane()` / `shouldExpandNavigationRail()`），窄屏自动切换状态卡排布
-- **顶栏渐变模糊** — 基于 [Haze](https://github.com/chrisbanes/haze) 的 `BlurredBar`：模糊半径、渐变强度、表面色叠加与深色主题判断集中在 `TopBarBlurConfig` / `rememberBlurState()` / `Modifier.blurSource()`
-- **主题与配色** — `AppTheme(themeMode)` 支持 6 档 `ColorSchemeMode`（System / Light / Dark / MonetSystem / MonetLight / MonetDark），并同步系统状态栏、导航栏与窗口背景
-- **背景特效组件** — `BgEffectBackground` + `BgEffectPainter` / `BgEffectModifier`（`OS2BgFrag` / `OS3BgFrag` 两种风格片段）
-- **配置系统** — `OptionSpec` / `OptionRegistry` / `ConfigState` / `PrefsStore` 驱动的声明式配置项，`HookOptionView` 按类型自动渲染开关 / 复选框 / 箭头 / 下拉 / 单选 / 滑块 / 文本 / 包名列表卡片，`HookOptionsPage` 提供分区 + 子页面 + 全局搜索
-- **对话框与动效** — `WindowDialog` 系列（滑块取值、文本取值、包名列表、系统重启确认、更新提示）、`DampedDragAnimation` / `InteractiveHighlight` / `folmeSpring` 动效规格
-- **设置页** — 界面（主题模式 / 悬浮底栏 / 液态玻璃 / 模糊开关）、语言（跟随系统 / 简体中文 / English，切换后 `recreate()`）、更新（启动自动检查 + 手动检查）、数据（配置 JSON 导出 / 导入）
-- **关于页** — Logo 折叠渐显顶栏、`textureBlur` 纹理模糊卡片、版本号、项目地址 / 群组 / 许可证入口，以及应用内第三方许可证与致谢页
-- **示例功能页** — `featureSpecs()` 内置每种组件类型的示例卡片与子页面（含子页面搜索），便于照葫芦画瓢
-- **应用内检查更新** — 启动自动检查与手动检查，发现新版本弹窗展示更新说明并跳转下载页
-- **语言** — `LocaleHelper` 包语言（`attachBaseContext`）；桌面图标由 `MainActivity` 单一提供
+1. **动效背景按需播放**：关于页的动效背景内部是每帧重绘的帧循环，同时又是该页多张 `textureBlur` 卡片的模糊来源。现在通过 `AboutPageContent(animateBackground = …)`，只在「关于页可见且不在切页动画中」时才播放，离开该页或处于切页动画期间彻底停掉帧循环。
+2. **切页动画期间挂起底栏模糊**：`val navBlurActive = blurActive && !isNavigating`。动画期间页面内容逐帧位移，整页 backdrop 会被逐帧重录、模糊被逐帧重算，是最主要的开销；动画期间底栏 / 侧栏改用实色，整页 `layerBackdrop` 也同步停止录制，动画结束后立即恢复。
+3. **预组合全部页面**：`beyondViewportPageCount = 3`，避免跨页跳转时目标页在动画进行中才首次组合（关于页的首次组合最贵：图标解码 + 多张模糊卡片 + 动效 painter）。
 
-<br>
+## 与参考模板的差异
 
-# 与原模板的差异（剥离清单）
+本工程的页面结构最初参考 [Ianzb/MiuixGuiTemplate](https://github.com/Ianzb/MiuixGuiTemplate) 做了一次纯 GUI 提取，之后按自己的需要做了调整与优化：
 
-| 项 | 处理 |
-|---|---|
-| `:hook` 模块（BaseHook / BaseLoad / DexKit / nativehook / rule / safemode / status / xposed 等） | **整个删除** |
-| 依赖 `libxposed-api` / `libxposed-service` / `dexkit` | 已从 `libs.versions.toml` 与 `app/build.gradle.kts` 移除 |
-| `packaging.resources.merges += "META-INF/xposed/*"`、`META-INF/xposed/*` 资源 | 已删除 |
-| `MainActivity` 的 `de.robv.android.xposed.category.MODULE_SETTINGS` intent-filter | 已删除（改为普通 `MAIN` + `LAUNCHER`） |
-| `HookStatusReceiver`（Xposed 广播回报接收器）、`SafeModeReader`、`RootHelper`、`AppRestarter` 原实现 | 已删除，改为 `bridge/` 下的同名桩实现（见下） |
-| 作用域列表页 `ScopeListActivity`、安全模式管理页 `SafeModeActivity` | 按需求删除（入口按钮同步移除） |
-| 设置页「模块」分区（安全模式 / 申请作用域 / 清空 DexKit 缓存 / 当前设备类型下拉） | 已删除，分区整体移除 |
-| 主页状态卡的「作用域申请」入口 | 已改为仅刷新本地状态（不再跳转已删除的页面） |
-| `build.gradle.kts` 的 `splits.abi`（仅 arm64-v8a）与 release 签名配置 | 已删除通用 ABI 切分，保留默认产物；签名配置仍按环境变量读取 |
-| `docs/`、`.github/workflows/`、`gradle/gradle-daemon-jvm.properties` | 已删除（前者随 hook 文档一并移除，后者要求 JDK 25） |
+| 方面 | 本工程 |
+| --- | --- |
+| 模块框架 | 无任何 Xposed / LSPosed 代码，`bridge/` 下为保留原签名的纯 GUI 桩实现（`isActivated` 恒 `false`、作用域恒为空） |
+| 页面 | 仅保留 GUI：首页 / 功能 / 设置 / 关于 / 开源许可 / 功能子页 |
+| 设置页 | 精简为界面、语言、更新、数据四组；无隐藏桌面图标开关，无设备类型下拉 |
+| 关于页 | 无模板来源标注，许可条目指向 Apache-2.0 |
+| 性能 | 见上一节的三项切页优化（本项目实现） |
+| 桌面图标 | 仅 `MainActivity` 单一入口（不再使用 `activity-alias` 别名机制） |
 
-**`bridge/` 桩实现**（保持原 `XposedServiceManager` / `HookStatusStore` 的 API 形状，使界面层调用点无需改动）：
+## 系统要求
 
-- `bridge/XposedServiceManager` — `isActivated` 恒为 `false`，`scope` 恒为空；`checkRoot()` 仍以 `su -c id` 探测 Root 并驱动主页状态卡；`ensureScope()` 直接回调成功，`removeScope()` 为空操作
-- `bridge/HookStatusStore` — 本地 device-protected `SharedPreferences` 记录「已生效」配置键，`rememberHookApplied()` 的「已生效 / 未生效」文案继续工作（无 Hook 回报，仅本地记录）
-- `bridge/AppRestarter` — 内联 `su -c` 执行能力，保留「重启应用」对话框的行为路径
-- `device/DeviceType` + `device/DeviceContext` — 设备形态探测（手机 / 平板 / 折叠屏，读 `persist.sys.multi_display_type`、`miui.os.Build.IS_TABLET`、`smallestScreenWidthDp`），覆盖项改由本地 `PrefsStore` 读取
+- Android 8.0（API 26）以上；编译 `compileSdk 37`，`minSdk 34`，`targetSdk 34`。
+- Android Studio（或命令行 Gradle）+ JDK 21。
+- 模糊效果依赖运行时着色器，Android 13（API 33）以上才生效；低版本自动回退为不透明顶栏 / 底栏。
 
-<br>
-
-# 系统要求
-
-- Android 14+（`minSdk 34`，`targetSdk 34`，`compileSdk 37`）
-- 构建环境：JDK 21、Gradle 9.7.1（`gradlew` 自带 wrapper）、Android SDK `platforms;android-37.0` + `build-tools;36.0.0`
-- 主页 Root 状态卡依赖设备已授权 `su`；「清空 DexKit 缓存」「申请作用域」等按钮已随剥离移除
-
-<br>
-
-# 构建
+## 构建
 
 ```bash
-# Debug APK
-./gradlew assembleDebug
-# 产物：app/build/outputs/apk/debug/app-debug.apk
-
-# Release APK（需要根目录 release.keystore 与下列环境变量）
-# KEYSTORE_PASSWORD / KEY_ALIAS（默认 release）/ KEY_PASSWORD
-./gradlew assembleRelease
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64
+export ANDROID_HOME=/opt/android-sdk
+./gradlew :app:assembleDebug
 ```
 
-## aarch64 / PRoot 容器上构建的注意事项
+产物：`app/build/outputs/apk/debug/app-debug.apk`。
 
-本工程在一台 aarch64 Android 设备的 PRoot Ubuntu 容器内验证通过，以下三点在该环境下是必需的：
+Release 包需要 `release.keystore` 与三个环境变量：`KEYSTORE_PASSWORD`、`KEY_ALIAS`（默认 `release`）、`KEY_PASSWORD`。
 
-1. **aapt2 必须指向 aarch64 原生版本**：`build-tools;37.0.0` 在 SDK 仓库里只有 x86_64 产物，容器跑不了；因此 `app/build.gradle.kts` 显式声明 `buildToolsVersion = "36.0.0"`（其中 `aapt2` 是 aarch64 原生 ELF，可正常解析 `android-37.0` 的 `resources.arsc`），并在 `gradle.properties` 或全局配置里设置：
-   ```properties
-   android.aapt2FromMavenOverride=/opt/android-sdk/build-tools/36.0.0/aapt2
+### 在 aarch64 / PRoot 容器里构建
+
+1. `app/build.gradle.kts` 固定使用 `buildToolsVersion = "36.0.0"`：该版本的 aapt2 有 aarch64 二进制，更新的 build-tools 只有 x86_64 版 aapt2，容器里无法执行。
+2. Gradle 主目录放在容器文件系统内，不要放在 `/sdcard`（共享主目录可能因文件锁不可靠而报 `FileAccessTimeJournal … java.io.IOException: Operation not permitted`）：
+
+   ```bash
+   GRADLE_USER_HOME=/root/.gradle-miuix ./gradlew --no-daemon --console=plain :app:assembleDebug
    ```
-2. **`GRADLE_USER_HOME` 放在容器内文件系统**：`/sdcard` 是 FAT 类共享存储，无法 `mmap` 执行本地库（`libnative-platform.so` 加载失败），缓存放容器内即可。
-3. **用 `--no-daemon` 单进程构建**：容器内 `fcntl` 文件锁不可靠，多个 Gradle 守护进程会互相抢 `journal-1.lock` 导致 `Could not create service of type FileAccessTimeJournal ... java.io.IOException: Operation not permitted`。构建完请确认没有残留守护进程，否则下一次构建会再次失败。
 
-```bash
-cd <工程目录>
-LANG=C.UTF-8 LC_ALL=C.UTF-8 JAVA_HOME=/usr/lib/jvm/java-21-openjdk-arm64 \
-ANDROID_HOME=/opt/android-sdk ANDROID_SDK_ROOT=/opt/android-sdk \
-./gradlew --no-daemon --console=plain :app:assembleDebug
-```
+3. 容器里建议加 `--no-daemon`，避免残留 daemon 互相抢锁。
 
-> 在标准 x86_64 开发机（Android Studio）上无需上述任何特殊配置。
-
-<br>
-
-# 目录结构
+## 目录结构
 
 ```
 app/src/main/java/com/katiusu/miuixgui/example/
-├── MainActivity.kt              # 四标签页外壳 + 三种底栏 + 宽屏导航栏
-├── TemplateApp.kt               # Application：初始化配置系统与桥接对象
-├── AppSettings.kt               # 应用级设置（主题模式 / 底栏 / 模糊 / 语言）
-├── LocaleHelper.kt              # 语言切换与包 Context
-├── UpdateChecker.kt             # GitHub Release 检查更新
-├── LicenseActivity.kt
-├── bridge/                      # 原 Xposed 侧对象的桩实现（API 形状保持不变）
-├── device/                      # 设备形态探测（DeviceType / DeviceContext）
-├── prefs/                       # OptionSpec / OptionRegistry / ConfigState / PrefsStore / ConfigBackup
-├── ui/component/                # 卡片、对话框、子页面骨架、动画（animation/）、特效（effect/）、液态玻璃（liquid/）
-├── ui/component/pref/           # 各类型配置卡片 + 分区页（HookOptionsPage）
-├── ui/icons/                    # 手写 ImageVector 状态图标
-├── ui/screen/                   # home / features / settings / about / subpage
-├── ui/theme/                    # AppTheme + ColorSchemeMode
-├── ui/util/                     # BlurUtils / MiuixAnimations / WindowBackground
-└── util/                        # SystemVersionDetector
+├── MainActivity.kt                 # 入口：设置状态、HorizontalPager、底栏 / 侧栏
+├── AppSettings.kt                  # 设置项数据类与持久化
+├── LocaleHelper.kt                 # 语言切换
+├── UpdateChecker.kt                # GitHub Release 更新检查
+├── TemplateApp.kt                  # Application
+├── LicenseActivity.kt              # 开源许可页宿主
+├── bridge/                         # 原模块框架 API 的纯 GUI 桩实现
+├── device/                         # 设备类型判定
+├── prefs/                          # 选项注册表与配置存储 / 导入导出
+├── util/                           # 系统版本探测
+└── ui/
+    ├── component/
+    │   ├── animation/              # 阻尼拖拽与按压高光动画
+    │   ├── effect/                 # 动效背景 painter / modifier
+    │   ├── liquid/                 # 液态玻璃折射、高光、内阴影
+    │   └── pref/                   # HookOptionsPage、各类偏好卡片
+    ├── icons/                      # 状态图标
+    ├── screen/                     # home / features / settings / about / subpage
+    ├── theme/                      # AppTheme
+    └── util/                       # BlurUtils（Haze 顶栏、textureBlur 底栏、断点）
+app/src/main/res/values[-en]/strings.xml   # 中英文案（两份条目一一对应）
 ```
 
-<br>
+## 二次开发
 
-# 二次开发
+1. 改包名：`app/build.gradle.kts` 的 `namespace` / `applicationId`，以及 `app/src/main/AndroidManifest.xml` 与源码目录结构。
+2. 改应用名与图标：`res/values/strings.xml` 的 `app_name`、`res/mipmap-anydpi/ic_launcher.xml` 等图标资源。
+3. 改关于页链接与更新源：`strings.xml` 的 `about_source_code_summary`、`about_telegram_summary`，以及 `UpdateChecker.REPO`（当前仍是 `your-name/your-repo` 占位符，需替换为自己的仓库）。
+4. 接入自己的功能：`FeaturesPage.kt` 里用 `OptionSpec` / `HookSection` 描述选项，`HookOptionsPage` 会自动生成界面、搜索与依赖关系。
+5. 删掉用不到的示例：`ui/component/effect/`、`ui/component/liquid/`、`prefs/` 与 `bridge/` 可整体移除，只要同步清掉引用点即可。
 
-1. 改包名 / 应用名：`app/build.gradle.kts` 的 `namespace` / `applicationId`、`settings.gradle.kts` 的 `rootProject.name`、`res/values*/strings.xml` 的 `app_name`（若改包名，`ExampleInstrumentedTest` 也要同步）。
-2. 换应用图标：`res/drawable/ic_launcher_*.xml`、`res/mipmap-*/ic_launcher*`。
-3. 改关于页链接：`strings.xml` 的 `about_source_code_summary`、`about_telegram_summary`；更新检查仓库改 `UpdateChecker.REPO`。
-4. 增删配置项：在 `ui/screen/features/FeaturesPage.kt` 的 `featureSpecs()` 里声明 `OptionSpec`，界面会自动渲染对应组件；子页面用 `HookSubPage` 并入功能页搜索。
-5. 增删页面：页面继承 `BaseSubPageActivity` 即可自动套用主题、背景与顶栏模糊。
+## 已知取舍
 
-<br>
+- 模糊基于运行时着色器与 RenderEffect，低端机或长时间滚动仍有开销；不需要时可在设置页关闭总开关。
+- 切页动画期间底栏会短暂变为实色（页面背景本身就是 surface 色，肉眼几乎无差异；只有关于页背后是动效背景时能看出细微变化），这是为了避免动画期间逐帧重算模糊。
+- `beyondViewportPageCount = 3` 让四个页面常驻组合，换来切页时不再中途组合新页面，代价是内存与冷启动组合量略增。
 
-# 已知取舍
+## 第三方依赖
 
-- **「已生效 / 未生效」为本地状态**：无 Hook 回报机制，仅由 `HookStatusStore` 记录本地配置变更，语义上等同于「已修改」。
-- **「重启应用」依赖 `su`**：`bridge/AppRestarter` 通过 `su -c` 执行 `am force-stop` 与重启；无 Root 时对话框会提示失败。
-- **作用域相关入口已移除**：`ensureScope()` 为直接成功的桩实现，主页状态卡恒显示「未激活」，这是剥离 Xposed 后的预期表现。
+| 库 | 版本 | 说明 |
+| --- | --- | --- |
+| Miuix（`top.yukonga.miuix.kmp`） | 0.9.4 | MIUI / HyperOS 风格 Compose 组件库（core / ui / shader / blur / preference / icons / squircle / navigation） |
+| Haze（`dev.chrisbanes.haze`） | 1.7.3 | 顶栏渐进模糊 |
+| AndroidX Compose | BOM 2026.09.00 | Compose、Material3、Activity Compose |
+| Material Icons Core | 1.7.8 | 图标 |
+| AndroidLiquidGlass（Kyant0） | — | `ui/component/liquid/`、`ui/component/animation/` 的折射、高光与阻尼动画移植自该项目（Apache-2.0） |
 
-<br>
+## 致谢
 
-# 第三方库
+- 感谢 [Miuix](https://github.com/Yukonga/miuix) 提供了整套 MIUI 风格组件。
+- 感谢 [Haze](https://github.com/chrisbanes/haze) 提供的渐进模糊实现。
+- 感谢 [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) 提供的液态玻璃参考实现。
+- 感谢 [Ianzb/MiuixGuiTemplate](https://github.com/Ianzb/MiuixGuiTemplate)：本工程的页面结构最初由它做纯 GUI 提取而来（该仓库以 AGPL-3.0 发布，本工程只保留界面部分，未包含其模块框架相关实现）。
 
-- [miuix](https://github.com/compose-miuix-ui/miuix) — HyperOS 风格 Compose UI 组件库（0.9.4）
-- [Haze](https://github.com/chrisbanes/haze) — Compose 背景模糊（1.7.3）
-- [AndroidX Compose](https://developer.android.com/jetpack/compose) — 声明式 UI 框架（BOM 2026.09.00）
-- [Material Icons](https://developer.android.com/jetpack/androidx/releases/compose-material) — 图标资源（1.7.8）
+## 许可证
 
-<br>
+本项目以 [Apache License 2.0](LICENSE) 发布，可自由使用、修改与分发（含商业用途），需保留版权与许可声明。
 
-# 来源与致谢
+```
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-本工程的界面层代码最初参考 [Ianzb/MiuixGuiTemplate](https://github.com/Ianzb/MiuixGuiTemplate)（LGPL-3.0）整理而来，只保留纯 GUI 部分，Xposed / Hook 相关实现与依赖均已剥离。感谢 [Miuix](https://github.com/compose-miuix-ui/miuix) 项目作者与所有开源贡献者。
+    http://www.apache.org/licenses/LICENSE-2.0
 
-<br>
-
-# 许可证
-
-本项目以 [The Unlicense](LICENSE) 发布：放弃全部著作权，进入公有领域，可自由复制、修改、分发（含商业用途），无需署名。
-
-第三方依赖（Miuix、AndroidX、Haze 等）仍按其各自许可证（主要为 Apache-2.0）授权，详见应用内「关于 → 第三方许可证与致谢」。
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
