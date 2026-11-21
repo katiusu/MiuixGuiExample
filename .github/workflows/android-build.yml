@@ -50,32 +50,28 @@ jobs:
       - name: Report build errors
         if: failure()
         run: |
-          python3 - <<'PY'
-          import os, re
-          p = "/tmp/b.log"
-          lines = open(p, encoding="utf-8", errors="replace").read().splitlines() if os.path.exists(p) else []
-          errs = [l for l in lines if l.startswith("e: ") or "Unresolved reference" in l]
-          if errs:
-              for l in errs[:40]:
-                  print("::error::" + l.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
-          else:
-              idx = [i for i, l in enumerate(lines) if "What went wrong" in l or "FAILURE:" in l]
-              start = idx[0] if idx else max(0, len(lines) - 45)
-              for l in lines[start:start + 45]:
-                  print("::error::" + l.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
-          PY
+          LOG=/tmp/b.log
+          if [ ! -f "$LOG" ]; then echo "::error::no build log"; exit 0; fi
+          ERRS=$(grep -c '^e: ' "$LOG" || true)
+          if [ "$ERRS" -gt 0 ]; then
+            grep '^e: ' "$LOG" | head -40 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::${l}"; done
+          else
+            tail -45 "$LOG" | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::${l}"; done
+          fi
 
       - name: Verify APK
         if: success()
         run: |
+          set -e
           APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
-          python3 - "$APK" <<'PY'
-          import sys, zipfile, hashlib, os
-          p = sys.argv[1]
-          z = zipfile.ZipFile(p)
-          names = z.namelist()
-          print("::notice::APK bytes=${os.path.getsize(p)} entries=${len(names)} manifest=${int('AndroidManifest.xml' in names)} arsc=${int('resources.arsc' in names)} sha256=${hashlib.sha256(open(p,'rb').read()).hexdigest()}")
-          PY
+          test -f "$APK"
+          SIZE=$(stat -c %s "$APK")
+          ENTRIES=$(unzip -l "$APK" | tail -1 | awk '{print $2}')
+          HAS_MANIFEST=$(unzip -l "$APK" | grep -c 'AndroidManifest.xml' || true)
+          HAS_ARSC=$(unzip -l "$APK" | grep -c 'resources.arsc' || true)
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          echo "APK=$APK"
+          echo "::notice::APK bytes=${SIZE} entries=${ENTRIES} manifest=${HAS_MANIFEST} arsc=${HAS_ARSC} sha256=${SHA}"
 
       - name: Upload APK
         if: success()
