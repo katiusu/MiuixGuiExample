@@ -16,13 +16,8 @@ allprojects {
     }
 }
 
-val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()
-rootProject.layout.buildDirectory.value(newBuildDir)
-
-subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
+// 产物统一落在本仓库根的 build/ 下（原 android/ 子目录布局的 ../../build 重定向已移除，
+// 它会把 APK 写到仓库外一层，CI 无法上传）。
 subprojects {
     project.evaluationDependsOn(":app")
 }
