@@ -20,9 +20,23 @@ jobs:
 
       - name: Prepare Android SDK
         run: |
-          yes | sdkmanager --licenses > /tmp/lic.log 2>&1 || true
-          sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1
-          tail -20 /tmp/sdk.log
+          SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          SM="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "${SM}" ]; then
+            echo "cmdline-tools missing, installing"
+            curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+            mkdir -p "${SDK_ROOT}/cmdline-tools"
+            unzip -q /tmp/cmdtools.zip -d "${SDK_ROOT}/cmdline-tools"
+            mv "${SDK_ROOT}/cmdline-tools/cmdline-tools" "${SDK_ROOT}/cmdline-tools/latest"
+          fi
+          echo "sdkmanager: ${SM}"
+          yes | "${SM}" --licenses > /tmp/lic.log 2>&1 || true
+          if ! "${SM}" "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1; then
+            tail -40 /tmp/sdk.log
+            exit 1
+          fi
+          tail -5 /tmp/sdk.log
+          ls "${SDK_ROOT}/platforms"
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
