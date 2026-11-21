@@ -1,0 +1,122 @@
+package com.katiusu.miuixgui.example.ui.component.pref
+
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.katiusu.miuixgui.example.R
+import com.katiusu.miuixgui.example.prefs.ConfigState
+import com.katiusu.miuixgui.example.prefs.OptionSpec
+import com.katiusu.miuixgui.example.ui.component.AppDialog
+import com.katiusu.miuixgui.example.ui.component.AppDialogButton
+import com.katiusu.miuixgui.example.ui.component.AppDialogButtonRow
+import top.yukonga.miuix.kmp.glass.GlassTextField
+import com.katiusu.miuixgui.example.ui.component.AppArrowPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text as MiuixText
+
+/**
+ * 把逗号 / 分号 / 换行 / 空格分隔的文本解析为去重后的包名列表。
+ */
+fun parsePackageList(raw: String): List<String> =
+    raw.split(',', '，', ';', '；', '\n', ' ', '\t')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+        .distinct()
+
+/**
+ * 包名列表卡片：点击后弹出多行输入对话框。
+ *
+ * 输入内容会在页面右上角生成「重启应用」按钮，用于批量重启这些应用。
+ */
+@Composable
+fun HookPackageListCard(
+    spec: OptionSpec,
+    modifier: Modifier = Modifier,
+) {
+    val enabled = rememberOptionEnabled(spec)
+    val value = ConfigState.string(spec.key, spec.defaultString)
+    var showDialog by remember { mutableStateOf(false) }
+    val packages = parsePackageList(value)
+    val summary = if (packages.isEmpty()) {
+        stringResource(R.string.hook_text_not_set)
+    } else {
+        stringResource(R.string.hook_package_list_count, packages.size)
+    }
+
+    AppArrowPreference(
+        title = stringResource(spec.titleRes),
+        summary = summary,
+        onClick = { if (enabled) showDialog = true },
+        enabled = enabled,
+        modifier = modifier,
+    )
+
+    if (showDialog) {
+        PackageListDialog(spec = spec, onDismiss = { showDialog = false })
+    }
+}
+
+@Composable
+private fun PackageListDialog(
+    spec: OptionSpec,
+    onDismiss: () -> Unit,
+) {
+    val current = ConfigState.string(spec.key, spec.defaultString)
+    val input = rememberTextFieldState(current)
+
+    AppDialog(
+        show = true,
+        title = stringResource(spec.titleRes),
+        summary = stringResource(R.string.hook_package_list_dialog_summary),
+        onDismissRequest = onDismiss,
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            GlassTextField(
+                state = input,
+                label = stringResource(R.string.hook_package_list_placeholder),
+                lineLimits = TextFieldLineLimits.MultiLine(maxHeightInLines = 6),
+                modifier = Modifier.fillMaxWidth(),
+            )
+            MiuixText(
+                text = stringResource(R.string.hook_package_list_hint),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                style = MiuixTheme.textStyles.footnote2,
+                modifier = Modifier.padding(top = 8.dp),
+            )
+            AppDialogButtonRow {
+                AppDialogButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f),
+                )
+                AppDialogButton(
+                    text = stringResource(R.string.hook_slider_restore_default),
+                    onClick = {
+                        ConfigState.set(spec.key, spec.defaultString)
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+                AppDialogButton(
+                    text = stringResource(R.string.action_confirm),
+                    onClick = {
+                        ConfigState.set(spec.key, input.text.toString())
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                    primary = true,
+                )
+            }
+        }
+    }
+}

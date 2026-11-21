@@ -1,10 +1,21 @@
 *.iml
-.gradle/
+.gradle
 /local.properties
-/.idea/
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
 .DS_Store
-build/
+/build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
+/.idea/
+/hook/build/
+/release.keystore
+
+# 逆向分析产物（本地保留，不入库）
+/reverse_report/

@@ -1,0 +1,151 @@
+name: CI Build
+
+env:
+  PROGRAM_NAME: "MiuixGuiTemplate"
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ master ]
+    paths:
+      - "app/**"
+      - "hook/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+  pull_request:
+    branches: [ master ]
+    paths:
+      - "app/**"
+      - "hook/**"
+      - "gradle/**"
+      - "*.gradle.kts"
+      - "gradle.properties"
+      - "gradlew"
+      - "gradlew.bat"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup JDK 25
+        uses: actions/setup-java@v5
+        with:
+          java-version: "25"
+          distribution: "temurin"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: 读取版本号
+        id: get_version
+        run: |
+          $content = Get-Content app/build.gradle.kts -Raw
+          $versionName = [regex]::Match($content, 'versionName = "([^"]+)"').Groups[1].Value
+          $versionCode = [regex]::Match($content, 'versionCode = (\d+)').Groups[1].Value
+          Write-Output "version_name=$versionName" >> $env:GITHUB_OUTPUT
+          Write-Output "version_code=$versionCode" >> $env:GITHUB_OUTPUT
+        shell: pwsh
+
+      - name: 生成 CI 版本号
+        id: generate_ci_version
+        run: |
+          $base = "${{ steps.get_version.outputs.version_name }}"
+          $ciVersion = "$base+ci$env:GITHUB_RUN_NUMBER"
+          Write-Output "ci_version=$ciVersion" >> $env:GITHUB_OUTPUT
+          Write-Host "CI Version: $ciVersion"
+        shell: pwsh
+
+      - name: 构建 Debug APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: 重命名 APK
+        run: |
+          $ciVersion = "${{ steps.generate_ci_version.outputs.ci_version }}"
+          $sourcePath = "app/build/outputs/apk/debug/app-arm64-v8a-debug.apk"
+          $destPath = "${{ env.PROGRAM_NAME }}_$ciVersion.apk"
+          
+          if (Test-Path $sourcePath) {
+            Move-Item -Path $sourcePath -Destination $destPath -Force
+            Write-Host "APK renamed to: $destPath"
+          } else {
+            Write-Host "Source APK not found at: $sourcePath"
+            Get-ChildItem -Path "app/build/outputs/apk/debug" -Recurse
+            exit 1
+          }
+        shell: pwsh
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.PROGRAM_NAME }}_${{ steps.generate_ci_version.outputs.ci_version }}
+          path: ${{ env.PROGRAM_NAME }}_${{ steps.generate_ci_version.outputs.ci_version }}.apk
+          retention-days: 7
+
+      - name: 上传到Telegram（测试话题）
+        if: github.event_name != 'pull_request'
+        env:
+          CHANNEL_ID: ${{ secrets.CHANNEL_ID }}
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          MESSAGE_THREAD_ID: ${{ secrets.TEST_MESSAGE_THREAD_ID }}
+          APK_FILE: "${{ github.workspace }}/${{ env.PROGRAM_NAME }}_${{ steps.generate_ci_version.outputs.ci_version }}.apk"
+          CI_VERSION: "${{ steps.generate_ci_version.outputs.ci_version }}"
+          ACTOR_NAME: "${{ github.actor }}"
+          RUN_URL: "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          EVENT_NAME: "${{ github.event_name }}"
+        run: |
+          if [ -z "${MESSAGE_THREAD_ID}" ]; then
+            echo "未配置 TEST_MESSAGE_THREAD_ID，跳过 Telegram 上传"
+            exit 0
+          fi
+          if [ -z "${CHANNEL_ID}" ] || [ -z "${BOT_TOKEN}" ]; then
+            echo "未配置 CHANNEL_ID / BOT_TOKEN，跳过 Telegram 上传"
+            exit 0
+          fi
+
+          ESCAPED_CAPTION=$(python3 -c '
+          import os, re
+
+          def escape_md_v2_code(text):
+              return text.replace("\\", "\\\\").replace("`", "\\`")
+
+          def escape_md_v2_url(text):
+              return re.sub(r"([)\\])", r"\\\1", text)
+
+          actor = escape_md_v2_code(os.environ.get("ACTOR_NAME", ""))
+          event_name = os.environ.get("EVENT_NAME", "")
+          run_url = escape_md_v2_url(os.environ.get("RUN_URL", ""))
+          ci_version = escape_md_v2_code(os.environ.get("CI_VERSION", ""))
+
+          lines = ["*CI Test Build*"]
+          if ci_version:
+              lines.append(f"Version: `{ci_version}`")
+          if run_url:
+              lines.append(f"Build: [View run]({run_url})")
+          if event_name == "workflow_dispatch":
+              lines.append(f"Manually run by `{actor}`")
+          print("\n".join(lines))
+          ')
+
+          echo "上传到测试话题: ${CHANNEL_ID} (thread ${MESSAGE_THREAD_ID})"
+          curl -sS --fail-with-body -F chat_id="${CHANNEL_ID}" \
+                  -F message_thread_id="${MESSAGE_THREAD_ID}" \
+                  -F document=@"${APK_FILE}" \
+                  -F parse_mode="MarkdownV2" \
+                  -F caption="${ESCAPED_CAPTION}" \
+                  https://api.telegram.org/bot${BOT_TOKEN}/sendDocument
+
+      - name: 显示构建信息
+        run: |
+          Write-Host "构建完成"
+          Write-Host "版本号: ${{ steps.generate_ci_version.outputs.ci_version }}"
+          Write-Host "构建产物已上传至 Actions Artifacts"
+        shell: pwsh

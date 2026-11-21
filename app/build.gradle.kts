@@ -1,130 +1,119 @@
-import java.util.Properties
-
-val buildTime = providers.gradleProperty("buildTime")
-    .orElse(providers.environmentVariable("BUILD_TIME"))
-    .getOrElse("dev")
-val appVersionName = providers.gradleProperty("appVersionName").get()
-val appVersionCode = providers.gradleProperty("appVersionCode").map(String::toInt).get()
-
 plugins {
-    // 版本在根 build.gradle.kts（libs.versions.toml）统一声明
-    id("com.android.application")
-    id("org.jetbrains.kotlin.plugin.compose")
+    alias(libs.plugins.android.application)
+    alias(libs.plugins.kotlin.compose)
+}
+
+abstract class BundleChangelog : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val changelog: RegularFileProperty
+
+    @get:OutputDirectory
+    abstract val assets: DirectoryProperty
+
+    @TaskAction
+    fun copyChangelog() {
+        changelog.get().asFile.copyTo(assets.file("changelog.md").get().asFile, overwrite = true)
+    }
+}
+
+androidComponents.onVariants { variant ->
+    val bundleChangelog = tasks.register<BundleChangelog>("bundle${variant.name.replaceFirstChar { it.uppercaseChar() }}Changelog") {
+        changelog.set(rootProject.layout.projectDirectory.file("changelog.md"))
+    }
+    variant.sources.assets?.addGeneratedSourceDirectory(bundleChangelog, BundleChangelog::assets)
 }
 
 android {
-    namespace = "com.katiusu.miuixexample"
+    namespace = "com.katiusu.miuixgui.example"
     compileSdk {
-        version = release(37) {
-            minorApiLevel = 2
-        }
-    }
-    ndkVersion = "28.2.13676358"
-
-    buildFeatures {
-        buildConfig = true
-        compose = true
+        // miuix 0.9.5 的 AAR 要求 compileSdk 至少为 Android 37.2。
+        version = release(37) { minorApiLevel = 2 }
     }
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
-    }
+    defaultConfig {
+        applicationId = "com.katiusu.miuixgui.example"
+        minSdk = 35
+        targetSdk = 37
+        versionCode = 18
+        versionName = "0.8.1"
 
-    packaging {
-        resources {
-            excludes += "**"
-        }
-        jniLibs {
-            useLegacyPackaging = true
-        }
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     signingConfigs {
         create("release") {
-            // 优先从环境变量读取（GitHub Actions 使用）
-            val keystorePath = System.getenv("KEYSTORE_PATH") ?: ""
-            val keystorePassword = System.getenv("KEYSTORE_PASSWORD") ?: ""
-            val keyAlias = System.getenv("KEY_ALIAS") ?: ""
-            val keyPassword = System.getenv("KEY_PASSWORD") ?: ""
-
-            if (keystorePath.isNotEmpty()) {
-                // 使用环境变量配置
-                storeFile = file(keystorePath)
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
-            } else {
-                // 回退到 keystore.properties 文件
-                val propsFile = rootProject.file("keystore.properties")
-                val props = Properties()
-                if (propsFile.exists()) props.load(propsFile.inputStream())
-                storeFile     = props.getProperty("storeFile")?.let { file(it) }
-                storePassword = props.getProperty("storePassword") ?: ""
-                this.keyAlias      = props.getProperty("keyAlias") ?: ""
-                this.keyPassword   = props.getProperty("keyPassword") ?: ""
-            }
-        }
-    }
-
-    defaultConfig {
-        applicationId = "com.katiusu.miuixexample"
-        minSdk = 33
-        targetSdk = 37
-        versionCode = appVersionCode
-        versionName = appVersionName
-        buildConfigField("String", "BUILD_TIME", "\"$buildTime\"")
-
-        ndk {
-            abiFilters += "arm64-v8a"
+            storeFile = file("../release.keystore")
+            storePassword = System.getenv("KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("KEY_ALIAS") ?: "release"
+            keyPassword = System.getenv("KEY_PASSWORD")
         }
     }
 
     buildTypes {
         release {
-            val releaseSigning = signingConfigs.getByName("release")
-            signingConfig = if (releaseSigning.storeFile != null && releaseSigning.storeFile!!.exists()) {
-                releaseSigning
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
-        create("releaseFast") {
-            initWith(getByName("release"))
-            isMinifyEnabled = false
-            isShrinkResources = false
-            matchingFallbacks += "release"
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
-
-    lint {
-        checkReleaseBuilds = false
-        abortOnError = false
+    compileOptions {
+        // miuix-nav 的 inline 路由 API 使用 JVM 21 字节码。
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
-
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21
+    buildFeatures {
+        compose = true
+    }
+    packaging {
+        dex {
+            useLegacyPackaging = true
+        }
     }
 }
 
 dependencies {
-    testImplementation("junit:junit:4.13.2")
+    implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.navigationevent)
-    implementation(libs.jetbrains.compose.foundation)
-    implementation(libs.bundles.miuix)
-    implementation(libs.iconics.core)
-    // 需要 @aar 后缀强制按 AAR 解析，版本目录不支持该后缀，故只复用版本号
-    implementation("com.mikepenz:community-material-typeface:${libs.versions.communityMaterialTypeface.get()}@aar")
+    implementation(libs.androidx.compose.material3)
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    testImplementation(libs.junit)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.junit)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
+    debugImplementation(libs.androidx.compose.ui.tooling)
+
+    implementation(libs.miuix.core)
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.blur)
+    implementation(libs.miuix.preference)
+    implementation(libs.miuix.icons)
+    implementation(libs.miuix.squircle)
+    implementation(libs.miuix.navigation)
+    // OS4 玻璃组件（HyperOS 4 材质）
+    implementation(libs.miuix.material)
+    implementation(libs.miuix.glass)
+    implementation(libs.miuix.glass.icons)
+    implementation(libs.material.icons)
     implementation(libs.androidx.graphics.shapes)
-    implementation(libs.aptabase.kotlin)
+    implementation(libs.commonmark)
 }

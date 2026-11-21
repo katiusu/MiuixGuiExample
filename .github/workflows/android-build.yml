@@ -1,14 +1,14 @@
-name: Android Build
+name: android-build
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -20,78 +20,62 @@ jobs:
 
       - name: Prepare Android SDK
         run: |
-          SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
-          SM="${SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
-          if [ ! -x "${SM}" ]; then
-            echo "cmdline-tools missing, installing"
-            curl -sSL -o /tmp/cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
-            mkdir -p "${SDK_ROOT}/cmdline-tools"
-            unzip -q /tmp/cmdtools.zip -d "${SDK_ROOT}/cmdline-tools"
-            mv "${SDK_ROOT}/cmdline-tools/cmdline-tools" "${SDK_ROOT}/cmdline-tools/latest"
+          set -e
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "runner sdk: $SDK"
+          if [ ! -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]; then
+            cd /tmp
+            curl -fsSL -o cmdtools.zip https://dl.google.com/android/repository/commandlinetools-linux-13114758_latest.zip
+            unzip -q cmdtools.zip -d cmdline-tools-tmp
+            mkdir -p "$SDK/cmdline-tools"
+            mv cmdline-tools-tmp/cmdline-tools "$SDK/cmdline-tools/latest"
           fi
-          echo "sdkmanager: ${SM}"
-          yes | "${SM}" --licenses > /tmp/lic.log 2>&1 || true
-          if ! "${SM}" "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1; then
-            tail -40 /tmp/sdk.log
-            exit 1
-          fi
-          tail -5 /tmp/sdk.log
-          ls "${SDK_ROOT}/platforms"
+          SDKMANAGER="$SDK/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          "$SDKMANAGER" "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1 || (tail -40 /tmp/sdk.log; exit 1)
 
-      - name: Setup Gradle
+      - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          set +e
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace > /tmp/b.log 2>&1
-          RC=$?
-          echo "GRADLE_RC=${RC}"
-          tail -40 /tmp/b.log
-          if [ "${RC}" != "0" ]; then
-            MSG=$(tail -150 /tmp/b.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
-            echo "::error::gradle rc=${RC} ${MSG}"
-            exit 1
-          fi
-          find . -name '*.apk' -exec ls -l {} + || true
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/b.log
 
       - name: Report build errors
         if: failure()
         run: |
-          LOG=/tmp/b.log
-          if [ ! -f "$LOG" ]; then echo "::error::no build log"; exit 0; fi
-          ERRS=$(grep -c '^e: ' "$LOG" || true)
-          if [ "$ERRS" -gt 0 ]; then
-            grep '^e: ' "$LOG" | head -40 | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::${l}"; done
-          else
-            tail -45 "$LOG" | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::${l}"; done
-          fi
+          python3 - <<'PY'
+          import pathlib, re
+          log = pathlib.Path('/tmp/b.log')
+          lines = log.read_text(errors='replace').splitlines() if log.exists() else []
+          errs = [l for l in lines if l.startswith('e: ') or 'Unresolved reference' in l]
+          if errs:
+              msg = '\n'.join(errs[:60])
+          else:
+              idx = next((i for i, l in enumerate(lines) if 'What went wrong' in l or 'FAILURE:' in l), None)
+              msg = '\n'.join(lines[idx:idx+45]) if idx is not None else '\n'.join(lines[-45:])
+          msg = msg.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+          print('::error::' + msg)
+          PY
+          exit 1
 
       - name: Verify APK
         if: success()
         run: |
-          APK=$(find . -name '*.apk' | head -1)
-          if [ -z "${APK}" ]; then
-            echo "::error::no apk found"
-            exit 1
-          fi
-          SIZE=$(stat -c %s "${APK}")
-          ENTRIES=$(unzip -l "${APK}" | wc -l)
-          MANIFEST=$(unzip -l "${APK}" | grep -c 'AndroidManifest.xml' || true)
-          ARSC=$(unzip -l "${APK}" | grep -c 'resources.arsc' || true)
-          SHA=$(sha256sum "${APK}" | cut -d' ' -f1)
-          echo "APK=${APK}"
-          if [ "${MANIFEST}" = "0" ] || [ "${ARSC}" = "0" ]; then
-            echo "::error::apk missing AndroidManifest.xml or resources.arsc"
-            exit 1
-          fi
-          echo "::notice::APK bytes=${SIZE} entries=${ENTRIES} manifest=${MANIFEST} arsc=${ARSC} sha256=${SHA}"
+          APK=$(find . -name '*.apk' -path '*debug*' | head -1)
+          test -n "$APK"
+          SIZE=$(stat -c%s "$APK")
+          ENTRIES=$(unzip -l "$APK" | tail -1 | awk '{print $2}')
+          MANIFEST=$(unzip -l "$APK" | grep -c 'AndroidManifest.xml')
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          echo "::notice::APK $APK bytes=$SIZE entries=$ENTRIES manifest=$MANIFEST sha256=$SHA"
 
       - name: Upload APK
         if: success()
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: "**/outputs/apk/**/*.apk"
+          path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error

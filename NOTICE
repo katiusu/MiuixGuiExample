@@ -1,19 +1,22 @@
-MiuixExample
-Copyright (c) 2026 IslandExample contributors
+MiuixGuiExample
+================
 
-本工程是 Miuix / HyperOS 风格 Compose 界面模板（示例工程），界面代码派生自
-HyperIsland（https://github.com/1812z/HyperIsland，MIT License,
-Copyright (c) 2026 1812z），原始许可文本见 LICENSE-HyperIsland。
+本仓库自身代码以 The Unlicense 贡献至公有领域（见 LICENSE）。
 
-改动摘要：
-- 移除 Xposed / LSPosed / Root 相关的全部框架、上层建筑与对应设置项
-  （module 入口、RemotePreferences 同步、hook 页、root shell 兜底等）；
-- 所有圆角改为连续曲率（squircle），几何由 miuix-squircle 提供；
-- 包名、应用名、域名、仓库地址等标识统一改为 example。
+第三方组件
+------------
 
-第三方组件（均为运行时依赖，其许可随各自产物分发）：
+以下依赖以各自许可证发布，未被本仓库的 Unlicense 覆盖：
+
 - miuix (top.yukonga.miuix.kmp:*) — Apache License 2.0
   https://github.com/compose-miuix-ui/miuix
-- AndroidX — Apache License 2.0
-- JetBrains Compose Multiplatform — Apache License 2.0
-- iconics / community-material-typeface — Apache License 2.0
+- AndroidX / Jetpack Compose / Material Icons — Apache License 2.0
+  https://developer.android.com/jetpack
+- Kotlin 标准库 — Apache License 2.0
+  https://kotlinlang.org
+- commonmark-java — BSD 2-Clause
+  https://github.com/commonmark/commonmark-java
+- androidx.graphics:graphics-shapes — Apache License 2.0
+  https://developer.android.com/jetpack/androidx/releases/graphics
+
+Android 平台代码和图标资源按 AOSP 许可条款使用。

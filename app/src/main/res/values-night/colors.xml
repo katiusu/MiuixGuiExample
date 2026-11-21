@@ -1,13 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="focus_panel_text_primary">#FFFFFFFF</color>
-    <color name="focus_panel_text_secondary">#BFFFFFFF</color>
-    <color name="focus_panel_text_tertiary">#8FFFFFFF</color>
-    <color name="focus_panel_card_background">#14FFFFFF</color>
-    <color name="focus_panel_card_stroke">#1FFFFFFF</color>
-    <color name="focus_panel_progress_track">#28FFFFFF</color>
-    <color name="focus_panel_progress_fill">#FFFFFFFF</color>
-    <color name="focus_panel_cpu">#FF72D6FF</color>
-    <color name="focus_panel_gpu">#FFFFB86B</color>
-    <color name="focus_panel_memory">#FF9EE493</color>
+	<!-- 深色模式窗口背景，与 Miuix 深色 surface 一致，避免启动白屏闪烁 -->
+	<color name="window_background">#FF000000</color>
 </resources>
