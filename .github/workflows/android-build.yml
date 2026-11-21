@@ -44,11 +44,17 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x gradlew
-          set -e
-          set -o pipefail
-          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/b.log
-          echo "--- apk outputs ---"
-          find build -name '*.apk' -exec ls -l {} + || true
+          set +e
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace > /tmp/b.log 2>&1
+          RC=$?
+          echo "GRADLE_RC=${RC}"
+          tail -40 /tmp/b.log
+          if [ "${RC}" != "0" ]; then
+            MSG=$(tail -150 /tmp/b.log | sed 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+            echo "::error::gradle rc=${RC} ${MSG}"
+            exit 1
+          fi
+          find . -name '*.apk' -exec ls -l {} + || true
 
       - name: Report build errors
         if: failure()
@@ -65,12 +71,9 @@ jobs:
       - name: Verify APK
         if: success()
         run: |
-          APK=$(find build -name '*.apk' | head -1)
+          APK=$(find . -name '*.apk' | head -1)
           if [ -z "${APK}" ]; then
-            echo "::error::no apk produced under build/"
-            ls -la || true
-            echo "--- tail build log ---"
-            tail -80 /tmp/b.log 2>/dev/null | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::${l}"; done
+            echo "::error::no apk found"
             exit 1
           fi
           SIZE=$(stat -c %s "${APK}")
