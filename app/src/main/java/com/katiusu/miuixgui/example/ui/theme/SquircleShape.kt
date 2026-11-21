@@ -47,12 +47,17 @@ class SquircleShape(
         )
         val path = Path()
         val cubics = polygon.cubics
-        path.moveTo(cubics[0].points[0], cubics[0].points[1])
-        cubics.forEach { cubic ->
-            val p = cubic.points
-            path.cubicTo(p[2], p[3], p[4], p[5], p[6], p[7])
+        if (cubics.isNotEmpty()) {
+            path.moveTo(cubics[0].anchor0.x, cubics[0].anchor0.y)
+            cubics.forEach { cubic ->
+                path.cubicTo(
+                    cubic.control0.x, cubic.control0.y,
+                    cubic.control1.x, cubic.control1.y,
+                    cubic.anchor1.x, cubic.anchor1.y,
+                )
+            }
+            path.close()
         }
-        path.close()
         return Outline.Generic(path)
     }
 }

@@ -163,7 +163,9 @@ fun HookOptionsPage(
     }
 
     LaunchedEffect(sections, flatSubPages) {
-        OptionRegistry.registerAll(allSpecs)
+        OptionRegistry.registerAll(
+            sections.flatMap { it.specs } + flatSubPages.flatMap { it.first.specs }
+        )
     }
 
     // 搜索结果摘要：把「配置键 → 分区 / 子页面路径」登记给全局搜索界面。
