@@ -48,7 +48,7 @@ jobs:
           set -o pipefail
           ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/b.log
           echo "--- apk outputs ---"
-          find app/build/outputs -name '*.apk' -exec ls -l {} + || true
+          find build -name '*.apk' -exec ls -l {} + || true
 
       - name: Report build errors
         if: failure()
@@ -65,10 +65,10 @@ jobs:
       - name: Verify APK
         if: success()
         run: |
-          APK=$(find app/build/outputs -name '*.apk' | head -1)
+          APK=$(find build -name '*.apk' | head -1)
           if [ -z "${APK}" ]; then
-            echo "::error::no apk produced under app/build/outputs"
-            find app/build/outputs -maxdepth 4 | head -40 || true
+            echo "::error::no apk produced under build/"
+            find build -maxdepth 4 | head -40 || true
             exit 1
           fi
           SIZE=$(stat -c %s "${APK}")
@@ -88,5 +88,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/*.apk
+          path: "**/outputs/apk/**/*.apk"
           if-no-files-found: error
