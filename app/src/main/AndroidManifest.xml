@@ -1,13 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!--
-        超级岛广播权限（signature 级）。
-        仅与 IslandExample 使用相同签名的应用可获得此权限，
-        保证只有本应用能触发 SystemUI 进程内的 IslandDispatcher Receiver。
+        通知卡片广播权限（signature 级）。
+        仅与 MiuixExample 使用相同签名的应用可获得此权限，
+        保证只有本应用能触发 SystemUI 进程内的 CardDispatcher Receiver。
     -->
     <permission
-        android:name="com.katiusu.islandexample.SEND_ISLAND"
+        android:name="com.katiusu.miuixexample.SEND_CARD"
         android:protectionLevel="signature" />
-    <uses-permission android:name="com.katiusu.islandexample.SEND_ISLAND" />
+    <uses-permission android:name="com.katiusu.miuixexample.SEND_CARD" />
 
     <!--
         跨应用屏幕录制控制权限（normal 级）。
@@ -15,7 +15,7 @@
         ScreenRecorderControlService 查询状态与控制录制。
     -->
     <permission
-        android:name="com.katiusu.islandexample.permission.CONTROL_SCREEN_RECORDER"
+        android:name="com.katiusu.miuixexample.permission.CONTROL_SCREEN_RECORDER"
         android:protectionLevel="normal" />
 
     <!-- 下载管理权限 -->
@@ -34,7 +34,7 @@
         android:usesPermissionFlags="neverForLocation" />
 
     <application
-        android:label="IslandExample"
+        android:label="MiuixExample"
         android:enableOnBackInvokedCallback="true"
         android:supportsRtl="true"
         android:icon="@drawable/ic_launcher">
@@ -61,7 +61,7 @@
             android:targetActivity=".MainActivity"
             android:enabled="true"
             android:exported="true"
-            android:label="IslandExample"
+            android:label="MiuixExample"
             android:icon="@drawable/ic_launcher">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
@@ -74,7 +74,7 @@
             android:process=":screen_recorder_control"
             android:stopWithTask="false">
             <intent-filter>
-                <action android:name="com.katiusu.islandexample.action.SCREEN_RECORDER_CONTROL" />
+                <action android:name="com.katiusu.miuixexample.action.SCREEN_RECORDER_CONTROL" />
             </intent-filter>
         </service>
     </application>

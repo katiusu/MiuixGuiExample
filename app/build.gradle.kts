@@ -13,7 +13,7 @@ plugins {
 }
 
 android {
-    namespace = "com.katiusu.islandexample"
+    namespace = "com.katiusu.miuixexample"
     compileSdk {
         version = release(37) {
             minorApiLevel = 2
@@ -68,7 +68,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.katiusu.islandexample"
+        applicationId = "com.katiusu.miuixexample"
         minSdk = 33
         targetSdk = 37
         versionCode = appVersionCode
