@@ -1,0 +1,63 @@
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Prepare Android SDK
+        run: |
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
+          command -v sdkmanager || echo 'sdkmanager missing'
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1 || tail -40 /tmp/sdk.log
+
+      - name: Build debug APK
+        run: |
+          chmod +x gradlew
+          set -o pipefail
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/b.log
+
+      - name: Report build errors
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          lines = open('/tmp/b.log', errors='ignore').read().splitlines()
+          errs = [l for l in lines if l.startswith('e: ') or 'Unresolved reference' in l]
+          for l in errs[:60]:
+              print('::error::' + l)
+          if not errs:
+              idx = [i for i, l in enumerate(lines) if 'What went wrong' in l or 'FAILURE' in l]
+              seg = lines[idx[0]:idx[0] + 45] if idx else lines[-45:]
+              for l in seg:
+                  print('::error::' + l)
+          PY
+
+      - name: Verify APK
+        if: success()
+        run: |
+          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
+          ENTRIES=$(unzip -l "$APK" | tail -1 | awk '{print $2}')
+          MANIFEST=$(unzip -l "$APK" | grep -c 'AndroidManifest.xml')
+          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+          echo "::notice::APK bytes=$(stat -c%s "$APK") entries=$ENTRIES manifest=$MANIFEST sha256=$SHA"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-debug
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn

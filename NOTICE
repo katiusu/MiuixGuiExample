@@ -1,0 +1,18 @@
+MiuixGui Template
+Copyright (c) 2026 MiuixGui Template contributors
+
+This product is licensed under the MIT License (see LICENSE).
+
+Third-party components:
+
+1. miuix (top.yukonga.miuix.kmp)
+   Copyright (c) miuix contributors
+   Licensed under the Apache License, Version 2.0
+   https://github.com/compose-miuix-ui/miuix
+
+2. AndroidX / Jetpack Compose
+   Copyright (c) The Android Open Source Project
+   Licensed under the Apache License, Version 2.0
+
+No source code from any other project is included in this repository.
+All Kotlin sources and drawable resources here were written for this template.
