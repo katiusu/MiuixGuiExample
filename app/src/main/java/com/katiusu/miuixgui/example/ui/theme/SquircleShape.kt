@@ -48,12 +48,12 @@ class SquircleShape(
         val path = Path()
         val cubics = polygon.cubics
         if (cubics.isNotEmpty()) {
-            path.moveTo(cubics[0].anchor0.x, cubics[0].anchor0.y)
+            path.moveTo(cubics[0].anchor0X, cubics[0].anchor0Y)
             cubics.forEach { cubic ->
                 path.cubicTo(
-                    cubic.control0.x, cubic.control0.y,
-                    cubic.control1.x, cubic.control1.y,
-                    cubic.anchor1.x, cubic.anchor1.y,
+                    cubic.control0X, cubic.control0Y,
+                    cubic.control1X, cubic.control1Y,
+                    cubic.anchor1X, cubic.anchor1Y,
                 )
             }
             path.close()
