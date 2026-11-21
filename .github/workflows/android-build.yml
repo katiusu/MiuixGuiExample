@@ -44,6 +44,7 @@ jobs:
       - name: Build debug APK
         run: |
           chmod +x gradlew
+          set -e
           set -o pipefail
           ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/b.log
           echo "--- apk outputs ---"
