@@ -68,7 +68,9 @@ jobs:
           APK=$(find build -name '*.apk' | head -1)
           if [ -z "${APK}" ]; then
             echo "::error::no apk produced under build/"
-            find build -maxdepth 4 | head -40 || true
+            ls -la || true
+            echo "--- tail build log ---"
+            tail -80 /tmp/b.log 2>/dev/null | sed 's/%/%25/g' | while IFS= read -r l; do echo "::error::${l}"; done
             exit 1
           fi
           SIZE=$(stat -c %s "${APK}")
