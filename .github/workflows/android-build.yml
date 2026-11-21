@@ -46,6 +46,8 @@ jobs:
           chmod +x gradlew
           set -o pipefail
           ./gradlew :app:assembleDebug --no-daemon --stacktrace 2>&1 | tee /tmp/b.log
+          echo "--- apk outputs ---"
+          find app/build/outputs -name '*.apk' -exec ls -l {} + || true
 
       - name: Report build errors
         if: failure()
@@ -62,16 +64,23 @@ jobs:
       - name: Verify APK
         if: success()
         run: |
-          set -e
-          APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
-          test -f "$APK"
-          SIZE=$(stat -c %s "$APK")
-          ENTRIES=$(unzip -l "$APK" | tail -1 | awk '{print $2}')
-          HAS_MANIFEST=$(unzip -l "$APK" | grep -c 'AndroidManifest.xml' || true)
-          HAS_ARSC=$(unzip -l "$APK" | grep -c 'resources.arsc' || true)
-          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
-          echo "APK=$APK"
-          echo "::notice::APK bytes=${SIZE} entries=${ENTRIES} manifest=${HAS_MANIFEST} arsc=${HAS_ARSC} sha256=${SHA}"
+          APK=$(find app/build/outputs -name '*.apk' | head -1)
+          if [ -z "${APK}" ]; then
+            echo "::error::no apk produced under app/build/outputs"
+            find app/build/outputs -maxdepth 4 | head -40 || true
+            exit 1
+          fi
+          SIZE=$(stat -c %s "${APK}")
+          ENTRIES=$(unzip -l "${APK}" | wc -l)
+          MANIFEST=$(unzip -l "${APK}" | grep -c 'AndroidManifest.xml' || true)
+          ARSC=$(unzip -l "${APK}" | grep -c 'resources.arsc' || true)
+          SHA=$(sha256sum "${APK}" | cut -d' ' -f1)
+          echo "APK=${APK}"
+          if [ "${MANIFEST}" = "0" ] || [ "${ARSC}" = "0" ]; then
+            echo "::error::apk missing AndroidManifest.xml or resources.arsc"
+            exit 1
+          fi
+          echo "::notice::APK bytes=${SIZE} entries=${ENTRIES} manifest=${MANIFEST} arsc=${ARSC} sha256=${SHA}"
 
       - name: Upload APK
         if: success()
