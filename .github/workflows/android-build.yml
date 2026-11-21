@@ -1,8 +1,8 @@
-name: Android CI
+name: Android Build
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -20,10 +20,12 @@ jobs:
 
       - name: Prepare Android SDK
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-          command -v sdkmanager || echo 'sdkmanager missing'
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1 || tail -40 /tmp/sdk.log
+          yes | sdkmanager --licenses > /tmp/lic.log 2>&1 || true
+          sdkmanager "platform-tools" "build-tools;36.0.0" "platforms;android-37.2" > /tmp/sdk.log 2>&1
+          tail -20 /tmp/sdk.log
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
         run: |
@@ -35,29 +37,36 @@ jobs:
         if: failure()
         run: |
           python3 - <<'PY'
-          lines = open('/tmp/b.log', errors='ignore').read().splitlines()
-          errs = [l for l in lines if l.startswith('e: ') or 'Unresolved reference' in l]
-          for l in errs[:60]:
-              print('::error::' + l)
-          if not errs:
-              idx = [i for i, l in enumerate(lines) if 'What went wrong' in l or 'FAILURE' in l]
-              seg = lines[idx[0]:idx[0] + 45] if idx else lines[-45:]
-              for l in seg:
-                  print('::error::' + l)
+          import os, re
+          p = "/tmp/b.log"
+          lines = open(p, encoding="utf-8", errors="replace").read().splitlines() if os.path.exists(p) else []
+          errs = [l for l in lines if l.startswith("e: ") or "Unresolved reference" in l]
+          if errs:
+              for l in errs[:40]:
+                  print("::error::" + l.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
+          else:
+              idx = [i for i, l in enumerate(lines) if "What went wrong" in l or "FAILURE:" in l]
+              start = idx[0] if idx else max(0, len(lines) - 45)
+              for l in lines[start:start + 45]:
+                  print("::error::" + l.replace("%", "%25").replace("\r", "").replace("\n", "%0A"))
           PY
 
       - name: Verify APK
         if: success()
         run: |
           APK=$(ls app/build/outputs/apk/debug/*.apk | head -1)
-          ENTRIES=$(unzip -l "$APK" | tail -1 | awk '{print $2}')
-          MANIFEST=$(unzip -l "$APK" | grep -c 'AndroidManifest.xml')
-          SHA=$(sha256sum "$APK" | cut -d' ' -f1)
-          echo "::notice::APK bytes=$(stat -c%s "$APK") entries=$ENTRIES manifest=$MANIFEST sha256=$SHA"
+          python3 - "$APK" <<'PY'
+          import sys, zipfile, hashlib, os
+          p = sys.argv[1]
+          z = zipfile.ZipFile(p)
+          names = z.namelist()
+          print("::notice::APK bytes=${os.path.getsize(p)} entries=${len(names)} manifest=${int('AndroidManifest.xml' in names)} arsc=${int('resources.arsc' in names)} sha256=${hashlib.sha256(open(p,'rb').read()).hexdigest()}")
+          PY
 
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - name: Upload APK
+        if: success()
+        uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
+          if-no-files-found: error

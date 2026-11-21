@@ -1,0 +1,521 @@
+package com.katiusu.islandexample.compose.component
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
+import com.katiusu.islandexample.R
+import top.yukonga.miuix.kmp.basic.BasicComponent
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.ScrollBehavior
+import top.yukonga.miuix.kmp.basic.SmallTitle
+import top.yukonga.miuix.kmp.blur.Backdrop
+import top.yukonga.miuix.kmp.glass.GlassIconButton
+import top.yukonga.miuix.kmp.glass.GlassSegmentedTabRow
+import top.yukonga.miuix.kmp.glass.GlassTopAppBar
+import top.yukonga.miuix.kmp.glass.GlassTopAppBarDefaults
+import top.yukonga.miuix.kmp.glass.glassPanel
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.basic.ArrowRight
+import top.yukonga.miuix.kmp.material.GlassEdgeStrokes
+import top.yukonga.miuix.kmp.material.GlassMaterials
+import top.yukonga.miuix.kmp.material.GlassShape
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+
+@Composable
+internal fun PageTopAppBar(
+    title: String,
+    largeTitle: String = title,
+    subtitle: String = "",
+    scrollBehavior: ScrollBehavior? = null,
+    navigationIcon: @Composable () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {},
+    bottomContent: @Composable () -> Unit = {},
+) {
+    val backdrop = LocalBarBlurBackdrop.current
+    // 只看 backdrop 是否存在：页面都用 `captureForEffects = true` 建立了 backdrop，
+    // tab / 搜索框 / 玻璃按钮也只是判空。若这里再叠 `LocalBarBlurEnabled`（界面模糊开关），
+    // 会出现「tab 和按钮是玻璃、顶栏却是纯色渐变」的割裂观感。
+    val progressiveBlur = backdrop != null
+    val scrolled = remember(scrollBehavior) {
+        derivedStateOf { (scrollBehavior?.state?.contentOffset ?: 0f) < 0f }
+    }
+    val band = GlassTopAppBarDefaults.bandBrush(MiuixTheme.colorScheme.surface)
+    GlassTopAppBar(
+        title = title,
+        largeTitle = largeTitle,
+        subtitle = subtitle,
+        isContentScrolled = scrolled.value,
+        // 柔光可用时不要再叠一层顶栏底色（band 顶部 alpha 0.9，会把柔光整个盖掉，
+        // 观感就是一块「纯色渐变」）；只有拿不到 backdrop 时才用渐变兜底保证标题可读。
+        modifier = if (progressiveBlur) Modifier else Modifier.background(band),
+        progressiveBlur = progressiveBlur,
+        backdrop = backdrop,
+        bandBrush = SolidColor(Color.Transparent),
+        bandOverhang = 0.dp,
+        scrollBehavior = scrollBehavior,
+        navigationIcon = navigationIcon,
+        actions = actions,
+        bottomContent = bottomContent,
+    )
+}
+
+@Composable
+internal fun PageTopBarIconButton(
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    if (enabled) {
+        GlassIconButton(onClick = onClick, modifier = modifier, content = content)
+    } else {
+        IconButton(
+            onClick = onClick,
+            modifier = modifier.size(GlassTopAppBarDefaults.ButtonSize),
+            enabled = false,
+        ) {
+            content()
+        }
+    }
+}
+
+/**
+ * 页面内的分段切换条（OS4 柔光样式）。
+ *
+ * 玻璃表面采样的是一个**纯色** [Backdrop]，而不是页面自己的 `LayerBackdrop`。原因是库的硬约束
+ * （见 `Modifier.glass` 的 KDoc）：玻璃表面不能位于它所用 backdrop 的录制子树内，否则会形成
+ * 采样环并直接崩溃。本应用的页面整体都被 `BarBackdropContent` 包住，列表项 / 固定头部里的控件
+ * 必然与录制子树重叠，所以这里只给玻璃一个稳定的纯色采样源。
+ *
+ * 放在 `PageTopAppBar` 的 `bottomContent` 里时，`GlassTopAppBar` 会用顶栏自己的 backdrop 覆盖
+ * 传入值（顶栏在录制子树之外，合法），此时才是真正的页面采样。
+ *
+ * [scrollBehavior] 用于驱动材质浮现：页面停在顶部时是实色轨道，下滑 32dp 后柔光浮现；传 null
+ * 则材质常驻。
+ */
+@Composable
+internal fun PageTabRow(
+    tabs: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+    scrollBehavior: ScrollBehavior? = null,
+) {
+    val tint = MiuixTheme.colorScheme.surface
+    val backdrop = remember(tint) { TintBackdrop(tint) }
+    val surfaceAlpha = GlassTopAppBarDefaults.collapseRamp(scrollBehavior)
+    GlassSegmentedTabRow(
+        tabs = tabs,
+        selectedIndex = selectedIndex,
+        onSelect = onSelect,
+        backdrop = backdrop,
+        surfaceAlpha = surfaceAlpha.value,
+        modifier = modifier,
+    )
+}
+
+/**
+ * 纯色 [Backdrop]：只提供一层稳定底色，不录制页面内容，因此不会被采样环牵连。
+ *
+ * 声明 `isCoordinatesDependent = false`：它的输出与绘制位置无关，不需要任何布局坐标。
+ */
+private class TintBackdrop(private val color: Color) : Backdrop {
+
+    override val isCoordinatesDependent: Boolean = false
+
+    override fun DrawScope.drawBackdrop(
+        density: Density,
+        coordinates: LayoutCoordinates?,
+        layerBlock: (GraphicsLayerScope.() -> Unit)?,
+        downscaleFactor: Float,
+    ) {
+        drawRect(color)
+    }
+}
+
+/**
+ * 顶栏内胶囊控件的玻璃底（搜索框等）。
+ *
+ * 与顶栏分段条同款材质：`puredThinGlass` + 主题描边，`shading = false`（主体由材质层提供）。
+ * 调用方需把控件自身背景设为 [Color.Transparent]，否则会盖住这层玻璃。
+ *
+ * 只能在 [BarBackdropContent] 之外使用（顶栏或固定头部），在录制子树内会形成采样环。
+ */
+@Composable
+internal fun Modifier.glassPill(
+    backdrop: Backdrop?,
+    cornerRadius: Dp = 999.dp,
+): Modifier {
+    val isDark = MiuixTheme.colorScheme.background.luminance() < 0.5f
+    val shape = remember(cornerRadius) { GlassShape(cornerRadius, smoothing = 0f) }
+    val fallbackFill = if (isDark) Color.White.copy(alpha = 0.08f) else Color.White
+    return this
+        .clip(shape)
+        .glassPanel(
+            backdrop = backdrop,
+            shape = shape,
+            material = GlassMaterials.puredThinGlass(isDark),
+            stroke = GlassEdgeStrokes.forTheme(isDark),
+            shadow = null,
+            shading = false,
+            fallback = Modifier.clip(shape).background(fallbackFill),
+        )
+}
+
+@Composable
+internal fun CollapsingPage(
+    title: String,
+    subtitle: String = "",
+    actionIcon: ImageVector? = null,
+    actionDescription: String = "",
+    onAction: (() -> Unit)? = null,
+    snackbarHost: @Composable () -> Unit = {},
+    horizontalContentPadding: Dp = 16.dp,
+    topContentPadding: Dp = 8.dp,
+    bottomContentPadding: Dp = 28.dp,
+    content: LazyListScope.() -> Unit,
+) {
+    val scrollBehavior = MiuixScrollBehavior()
+    val blurEnabled = LocalBarBlurEnabled.current
+    BarBlurHost(enabled = blurEnabled, captureForEffects = true) {
+        Scaffold(
+            topBar = {
+                PageTopAppBar(
+                    title = title,
+                    largeTitle = title,
+                    subtitle = subtitle,
+                    scrollBehavior = scrollBehavior,
+                    actions = {
+                        if (actionIcon != null && onAction != null) {
+                            PageTopBarIconButton(onClick = onAction) {
+                                Icon(actionIcon, actionDescription)
+                            }
+                        }
+                    },
+                )
+            },
+            snackbarHost = snackbarHost,
+        ) { padding ->
+            BarBackdropContent(modifier = Modifier.fillMaxSize()) {
+                PageList(
+                    padding = padding,
+                    scrollBehavior = scrollBehavior,
+                    horizontalContentPadding = horizontalContentPadding,
+                    topContentPadding = topContentPadding,
+                    bottomContentPadding = bottomContentPadding,
+                    content = content,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DetailPage(
+    title: String,
+    onBack: () -> Unit,
+    actionIcon: ImageVector? = null,
+    actionDescription: String = "",
+    onAction: (() -> Unit)? = null,
+    snackbarHost: @Composable () -> Unit = {},
+    floatingActionButton: @Composable () -> Unit = {},
+    /**
+     * 列表底部留白。[PageList] 不使用 Scaffold 的底部内边距，所以右下角有悬浮按钮时
+     * 必须由调用方把这个值调大（FAB 高 60dp + 12dp 间距），否则最后一行会被按钮压住。
+     */
+    bottomContentPadding: Dp = 28.dp,
+    /**
+     * 顶栏下方固定内容（如分段切换条）。
+     *
+     * 必须挂在顶栏内而不是列表首项：页面内容整体位于 [BarBackdropContent] 的录制子树中，
+     * 玻璃控件若跟着列表一起被录制，就会采样到自己（采样环）。顶栏在录制子树之外。
+     */
+    topBarContent: @Composable (ScrollBehavior) -> Unit = {},
+    content: LazyListScope.() -> Unit,
+) {
+    val scrollBehavior = MiuixScrollBehavior()
+    val blurEnabled = LocalBarBlurEnabled.current
+    BarBlurHost(enabled = blurEnabled, captureForEffects = true) {
+        Scaffold(
+            topBar = {
+                PageTopAppBar(
+                    title = title,
+                    scrollBehavior = scrollBehavior,
+                    navigationIcon = {
+                        PageTopBarIconButton(onClick = onBack) {
+                            Icon(MiuixIcons.Back, stringResource(R.string.back))
+                        }
+                    },
+                    actions = {
+                        if (actionIcon != null && onAction != null) {
+                            PageTopBarIconButton(onClick = onAction) {
+                                Icon(actionIcon, actionDescription)
+                            }
+                        }
+                    },
+                    bottomContent = { topBarContent(scrollBehavior) },
+                )
+            },
+            floatingActionButton = floatingActionButton,
+            snackbarHost = snackbarHost,
+        ) { padding ->
+            BarBackdropContent(modifier = Modifier.fillMaxSize()) {
+                PageList(
+                    padding = padding,
+                    scrollBehavior = scrollBehavior,
+                    bottomContentPadding = bottomContentPadding,
+                    content = content,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * 与 [DetailPage] 同构的详情页，正文使用响应式网格。
+ *
+ * [columns] 使用 [GridCells.Adaptive] 时列数随可用宽度动态变化：手机等窄屏为双列，
+ * 平板 / 折叠屏 / 桌面等宽屏自动增加列数，卡片同步拉伸铺满。
+ * 默认 128dp 可保证 320dp 起的窄屏稳定双列，超过约 440dp 后开始增加列数。
+ */
+@Composable
+internal fun DetailGridPage(
+    title: String,
+    onBack: () -> Unit,
+    columns: GridCells = GridCells.Adaptive(minSize = 128.dp),
+    horizontalContentPadding: Dp = 16.dp,
+    topContentPadding: Dp = 8.dp,
+    bottomContentPadding: Dp = 28.dp,
+    actions: @Composable RowScope.() -> Unit = {},
+    snackbarHost: @Composable () -> Unit = {},
+    isRefreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
+    content: LazyGridScope.() -> Unit,
+) {
+    val scrollBehavior = MiuixScrollBehavior()
+    val blurEnabled = LocalBarBlurEnabled.current
+    BarBlurHost(enabled = blurEnabled, captureForEffects = true) {
+        Scaffold(
+            topBar = {
+                PageTopAppBar(
+                    title = title,
+                    largeTitle = title,
+                    scrollBehavior = scrollBehavior,
+                    navigationIcon = {
+                        PageTopBarIconButton(onClick = onBack) {
+                            Icon(MiuixIcons.Back, stringResource(R.string.back))
+                        }
+                    },
+                    actions = actions,
+                )
+            },
+            snackbarHost = snackbarHost,
+        ) { padding ->
+            BarBackdropContent(modifier = Modifier.fillMaxSize()) {
+                if (onRefresh != null) {
+                    PullToRefresh(
+                        isRefreshing = isRefreshing,
+                        onRefresh = onRefresh,
+                        modifier = Modifier.fillMaxSize(),
+                        topAppBarScrollBehavior = scrollBehavior,
+                        contentPadding = PaddingValues(top = padding.calculateTopPadding()),
+                        refreshTexts = listOf("", "", "", ""),
+                    ) {
+                        PageGrid(
+                            padding = padding,
+                            scrollBehavior = scrollBehavior,
+                            columns = columns,
+                            horizontalContentPadding = horizontalContentPadding,
+                            topContentPadding = topContentPadding,
+                            bottomContentPadding = bottomContentPadding,
+                            content = content,
+                        )
+                    }
+                } else {
+                    PageGrid(
+                        padding = padding,
+                        scrollBehavior = scrollBehavior,
+                        columns = columns,
+                        horizontalContentPadding = horizontalContentPadding,
+                        topContentPadding = topContentPadding,
+                        bottomContentPadding = bottomContentPadding,
+                        content = content,
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PageGrid(
+    padding: PaddingValues,
+    scrollBehavior: ScrollBehavior,
+    columns: GridCells,
+    horizontalContentPadding: Dp,
+    topContentPadding: Dp,
+    bottomContentPadding: Dp,
+    content: LazyGridScope.() -> Unit,
+) {
+    LazyVerticalGrid(
+        columns = columns,
+        modifier = Modifier
+            .fillMaxSize()
+            .overScrollVertical()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentPadding = PaddingValues(
+            start = horizontalContentPadding,
+            top = padding.calculateTopPadding() + topContentPadding,
+            end = horizontalContentPadding,
+            bottom = bottomContentPadding + LocalRootBottomBarPadding.current,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
+}
+
+@Composable
+private fun PageList(
+    padding: PaddingValues,
+    scrollBehavior: ScrollBehavior,
+    horizontalContentPadding: Dp = 16.dp,
+    topContentPadding: Dp = 8.dp,
+    bottomContentPadding: Dp = 28.dp,
+    content: LazyListScope.() -> Unit,
+) {
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .overScrollVertical()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentPadding = PaddingValues(
+            start = horizontalContentPadding,
+            top = padding.calculateTopPadding() + topContentPadding,
+            end = horizontalContentPadding,
+            bottom = bottomContentPadding + LocalRootBottomBarPadding.current,
+        ),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        content = content,
+    )
+}
+
+@Composable
+internal fun SectionTitle(title: String) {
+    SmallTitle(
+        text = title,
+        modifier = Modifier.padding(top = 4.dp),
+        insideMargin = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+    )
+}
+
+@Composable
+internal fun SettingsAction(
+    title: String,
+    icon: ImageVector? = null,
+    summary: String? = null,
+    endIcon: ImageVector? = null,
+    endIconSize: Dp = 20.dp,
+    endContent: (@Composable () -> Unit)? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        startAction = icon?.let { image -> { SettingsIcon(image) } },
+        endActions = {
+            if (endContent != null) {
+                endContent()
+            } else if (endIcon != null) {
+                Icon(
+                    imageVector = endIcon,
+                    contentDescription = null,
+                    modifier = Modifier.size(endIconSize),
+                    tint = if (enabled) {
+                        MiuixTheme.colorScheme.onSurfaceVariantActions
+                    } else {
+                        MiuixTheme.colorScheme.disabledOnSurface
+                    },
+                )
+            }
+        },
+        insideMargin = SettingsItemMargin,
+        enabled = enabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
+internal fun SettingsActionWithArrow(
+    title: String,
+    icon: ImageVector? = null,
+    summary: String? = null,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        startAction = icon?.let { image -> { SettingsIcon(image) } },
+        endActions = {
+            Icon(
+                imageVector = MiuixIcons.Basic.ArrowRight,
+                contentDescription = null,
+                modifier = Modifier.size(width = 10.dp, height = 16.dp),
+                tint = if (enabled) {
+                    MiuixTheme.colorScheme.onSurfaceVariantActions
+                } else {
+                    MiuixTheme.colorScheme.disabledOnSurface
+                },
+            )
+        },
+        insideMargin = SettingsItemMargin,
+        enabled = enabled,
+        onClick = onClick,
+    )
+}
+
+@Composable
+internal fun SettingsIcon(imageVector: ImageVector) {
+    Icon(
+        modifier = Modifier.padding(end = 16.dp),
+        imageVector = imageVector,
+        contentDescription = null,
+        tint = MiuixTheme.colorScheme.onBackground,
+    )
+}
+
+internal val SettingsItemMargin = PaddingValues(horizontal = 18.dp, vertical = 14.dp)

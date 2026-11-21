@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<data-extraction-rules>
-    <cloud-backup>
-        <exclude domain="sharedpref" path="miuix_gui_settings.xml" />
-    </cloud-backup>
-</data-extraction-rules>

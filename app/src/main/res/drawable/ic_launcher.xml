@@ -1,0 +1,47 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+        android:width="108dp"
+        android:height="108dp"
+        android:viewportWidth="1080"
+        android:viewportHeight="1080">
+
+    <!-- 背景 -->
+    <path
+            android:fillColor="#BBD0FA"
+            android:pathData="M160,0H920C1008.37,0 1080,71.63 1080,160V920C1080,1008.37 1008.37,1080 920,1080H160C71.63,1080 0,1008.37 0,920V160C0,71.63 71.63,0 160,0Z" />
+
+    <!-- 内部内容整体缩小 -->
+    <group
+            android:pivotX="540"
+            android:pivotY="540"
+            android:scaleX="0.86"
+            android:scaleY="0.86">
+
+        <!-- 主体形状 -->
+        <path
+                android:fillColor="#FFFFFF"
+                android:pathData="
+                M356,159
+                L696,159
+                C673,190 660,226 660,264
+                C660,362 739,442 836,442
+                C866,442 895,434 921,421
+                L921,724
+                C921,833 833,921 724,921
+                L356,921
+                C247,921 159,833 159,724
+                L159,356
+                C159,247 247,159 356,159
+                Z" />
+
+        <!-- 右上角圆形 -->
+        <path
+                android:fillColor="#FFFFFF"
+                android:pathData="
+                M830,156
+                A122,122 0,1 1,830,400
+                A122,122 0,1 1,830,156
+                Z" />
+
+    </group>
+
+</vector>
