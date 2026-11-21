@@ -45,8 +45,9 @@ fun AppShell(settings: AppSettings) {
     var selectedIndex by rememberSaveable { mutableIntStateOf(0) }
 
     // 背景采样层：玻璃底栏从这一层取色做实时模糊/折射。
+    val surfaceColor = MiuixTheme.colorScheme.surface
     val backdrop = rememberLayerBackdrop {
-        drawRect(MiuixTheme.colorScheme.surface)
+        drawRect(surfaceColor)
         drawContent()
     }
 
