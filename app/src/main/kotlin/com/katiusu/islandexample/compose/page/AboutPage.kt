@@ -97,7 +97,6 @@ internal fun AboutPage(
     onCheckUpdate: () -> Unit,
     onOpenBackupRestore: () -> Unit,
     onOpenReferences: () -> Unit,
-    onOpenDebugTools: () -> Unit,
     onOpenChangelog: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -229,11 +228,6 @@ internal fun AboutPage(
                         },
                         enabled = !isCheckingUpdate,
                         onClick = onCheckUpdate,
-                    )
-                    SettingsActionWithArrow(
-                        title = stringResource(R.string.debug_tools),
-                        icon = MiuixIcons.Tune,
-                        onClick = onOpenDebugTools,
                     )
                 }
             }

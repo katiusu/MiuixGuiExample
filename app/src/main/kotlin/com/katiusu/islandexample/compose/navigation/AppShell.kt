@@ -312,7 +312,7 @@ internal fun IslandExampleApp(prefs: FlutterPrefsRepository) {
 
     PredictiveNavigationBackHandler(
         visible = nestedDetailShown,
-        enabled = nestedDetailShown && !extensionSubDetailShown,
+        enabled = nestedDetailShown,
         state = nestedNavigationState,
         maxTranslationPercent = predictiveBackMaxTranslation.value,
         onDismiss = {
@@ -321,17 +321,7 @@ internal fun IslandExampleApp(prefs: FlutterPrefsRepository) {
             sceneBrightnessShown = false
             visibleChannelEditor = null
             if (visibleChannelApp != null) batchChannelTarget = null
-            extensionDetail = null
-            extensionSubDetail = null
         },
-    )
-
-    PredictiveNavigationBackHandler(
-        visible = extensionSubDetailShown,
-        enabled = extensionSubDetailShown,
-        state = extensionNavigationState,
-        maxTranslationPercent = predictiveBackMaxTranslation.value,
-        onDismiss = { extensionSubDetail = null },
     )
 
     BarBlurHost(
@@ -383,8 +373,6 @@ internal fun IslandExampleApp(prefs: FlutterPrefsRepository) {
                                         batchToastPackages = null
                                         visibleChannelApp = null
                                         visibleToastApp = null
-                                        extensionDetail = null
-                                        extensionSubDetail = null
                                         visibleDetail = SettingsDetail.Donors
                                         detailShown = true
                                     },
@@ -433,8 +421,6 @@ internal fun IslandExampleApp(prefs: FlutterPrefsRepository) {
                                         batchToastPackages = null
                                         visibleChannelApp = null
                                         visibleToastApp = null
-                                        extensionDetail = null
-                                        extensionSubDetail = null
                                         visibleDetail = it
                                         detailShown = true
                                     },
@@ -457,14 +443,6 @@ internal fun IslandExampleApp(prefs: FlutterPrefsRepository) {
                                         visibleChannelApp = null
                                         visibleToastApp = null
                                         visibleDetail = SettingsDetail.References
-                                        detailShown = true
-                                    },
-                                    onOpenDebugTools = {
-                                        batchChannelTarget = null
-                                        batchToastPackages = null
-                                        visibleChannelApp = null
-                                        visibleToastApp = null
-                                        visibleDetail = SettingsDetail.DebugTools
                                         detailShown = true
                                     },
                                     onOpenChangelog = {
